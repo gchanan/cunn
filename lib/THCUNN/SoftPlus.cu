@@ -38,6 +38,5 @@ struct softPlusupdateGradInput_functor
   }
 };
 
-
 #include "generic/SoftPlus.cu"
 #include "THCGenerateFloatTypes.h"
