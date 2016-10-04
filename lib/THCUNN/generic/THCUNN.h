@@ -150,6 +150,6 @@ TH_API void THNN_(Threshold_updateGradInput)(
                   THCTensor *gradInput,
                   real threshold,
                   real val,
-                  real inplace);
+                  bool inplace);
 
 #endif
