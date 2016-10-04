@@ -54,7 +54,7 @@ struct LSMFinal
 
   __device__ __forceinline__ AccumulatorT operator()(AccumulatorT v) const
   {
-    return max_k + THCNumerics<AccumulatorT>::exp(v);
+    return max_k + THCNumerics<AccumulatorT>::log(v);
   }
 
   const AccumulatorT max_k;
