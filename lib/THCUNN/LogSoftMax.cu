@@ -1,64 +1,71 @@
 #include "THCUNN.h"
-#include "common.h"
+#include "THCHalf.h"
+#include "THCHalfAutoNumerics.cuh"
+#include "SharedMem.cuh"
 
+template <typename T, typename AccumulatorT>
 struct MaxFloat
 {
-  __device__ __forceinline__ float operator()(float max, float v) const
+  __device__ __forceinline__ AccumulatorT operator()(AccumulatorT max, T v) const
   {
-    return fmaxf(max, v);
+    return fmaxType(max, v);
   }
 };
 
+template<typename T, typename AccumulatorT>
 struct SumFloat
 {
-  __device__ __forceinline__ float operator()(float sum, float v) const
+  __device__ __forceinline__ AccumulatorT operator()(AccumulatorT sum, T v) const
   {
     return sum + v;
   }
 };
 
+template<typename T, typename AccumulatorT>
 struct SumExpFloat
 {
-  __device__ __forceinline__ SumExpFloat(float v)
+  __device__ __forceinline__ SumExpFloat(T v)
     : max_k(v)
   {}
 
-  __device__ __forceinline__ float operator()(float sum, float v) const
+  __device__ __forceinline__ AccumulatorT operator()(AccumulatorT sum, T v) const
   {
-    return sum + expf(v - max_k);
+    return sum + THCNumerics<T>::exp(v - max_k);
   }
 
-  const float max_k;
+  const T max_k;
 };
 
+template<typename AccumulatorT>
 struct NoFinal
 {
-  __device__ __forceinline__ float operator()(float v) const
+  __device__ __forceinline__ AccumulatorT operator()(AccumulatorT v) const
   {
     return v;
   }
 };
 
+template<typename AccumulatorT>
 struct LSMFinal
 {
-  __device__ __forceinline__ LSMFinal(float m)
+  __device__ __forceinline__ LSMFinal(AccumulatorT m)
     : max_k(m)
   {}
 
-  __device__ __forceinline__ float operator()(float v) const
+  __device__ __forceinline__ AccumulatorT operator()(AccumulatorT v) const
   {
-    return max_k + logf(v);
+    return max_k + THCNumerics<AccumulatorT>::exp(v);
   }
 
-  const float max_k;
+  const AccumulatorT max_k;
 };
 
-template <typename Reduction, typename Finalize>
-__device__ __forceinline__ float
-blockReduce(float* smem, float val,
-            const Reduction& r,
-            float defaultVal,
-            const Finalize& f)
+template <template<typename, typename> class Reduction, template<typename> class Finalize, typename AccumulatorT>
+__device__ __forceinline__ AccumulatorT
+blockReduce(AccumulatorT* smem, AccumulatorT val,
+            const Reduction<AccumulatorT, AccumulatorT>& r,
+            AccumulatorT defaultVal,
+            const Finalize<AccumulatorT>& f)
 {
   // To avoid RaW races from chaining blockReduce calls together, we
   // need a sync here
@@ -68,7 +75,7 @@ blockReduce(float* smem, float val,
 
   __syncthreads();
 
-  float warpVal = defaultVal;
+  AccumulatorT warpVal = defaultVal;
 
   // First warp will perform per-warp reductions for the remaining warps
   if ((threadIdx.x / 32) == 0) // only threads in warp1 go into this (if)
@@ -76,7 +83,7 @@ blockReduce(float* smem, float val,
     int lane = threadIdx.x % 32; // from 0 to 31
 
     // if less than 1024 threads per block, then only activate the relevant lanes
-    if (lane < blockDim.x / 32) 
+    if (lane < blockDim.x / 32)
     {
 #pragma unroll
       for (int i = 0; i < 32; ++i)
@@ -91,7 +98,7 @@ blockReduce(float* smem, float val,
   __syncthreads();
 
   // First thread will perform a reduction of the above per-warp reductions
-  float blockVal = defaultVal;
+  AccumulatorT blockVal = defaultVal;
 
   if (threadIdx.x == 0)
   {
@@ -108,23 +115,23 @@ blockReduce(float* smem, float val,
   return smem[0];
 }
 
-template <typename Reduction>
-__device__ __forceinline__ float
-blockReduce(float* smem, float val,
-            const Reduction& r,
-            float defaultVal)
+template <template<typename, typename> class Reduction, typename AccumulatorT>
+__device__ __forceinline__ AccumulatorT
+blockReduce(AccumulatorT* smem, AccumulatorT val,
+            const Reduction<AccumulatorT, AccumulatorT>& r,
+            AccumulatorT defaultVal)
 {
-  return blockReduce<Reduction, NoFinal>(smem, val, r, defaultVal, NoFinal());
+  return blockReduce<Reduction, NoFinal, AccumulatorT>(smem, val, r, defaultVal, NoFinal<AccumulatorT>());
 }
 
-template <typename Reduction, int ILP>
-__device__ __forceinline__ float
-ilpReduce(float* data,
+template <template<typename, typename> class Reduction, int ILP, typename T, typename AccumulatorT>
+__device__ __forceinline__ AccumulatorT
+ilpReduce(T* data,
           int size,
-          const Reduction& r,
-          float defaultVal)
+          const Reduction<T, AccumulatorT>& r,
+          AccumulatorT defaultVal)
 {
-  float threadVal = defaultVal;
+  AccumulatorT threadVal = defaultVal;
   int offset = threadIdx.x;
 
   int last = size % (ILP * blockDim.x);
@@ -132,7 +139,7 @@ ilpReduce(float* data,
   // Body (unroll by ILP times)
   for (; offset < size - last; offset += blockDim.x * ILP)
   {
-    float tmp[ILP];
+    T tmp[ILP];
 
 #pragma unroll
     for (int j = 0; j < ILP; ++j)
@@ -156,28 +163,30 @@ ilpReduce(float* data,
   return threadVal;
 }
 
-template <int ILP>
+template <int ILP, typename T, typename AccumulatorT>
 __global__ void
-cunn_LogSoftMax_updateOutput_kernel(float *output, float *input, int classes)
+cunn_LogSoftMax_updateOutput_kernel(T *output, T *input, int classes)
 {
-  extern __shared__ float buffer[];
+  SharedMem<AccumulatorT> smem;
+  AccumulatorT *buffer = smem.getPointer();
   // forward pointers to batch[blockIdx.x]
   // each block handles a sample in the mini-batch
   input += blockIdx.x * classes;
   output += blockIdx.x * classes;
 
   // find the max of the batch
-  float threadMax =
-    ilpReduce<MaxFloat, ILP>(input, classes, MaxFloat(), -FLT_MAX);
+  AccumulatorT threadMax = ilpReduce<MaxFloat, ILP, T, AccumulatorT>(
+      input, classes, MaxFloat<T, AccumulatorT>(), -THCNumerics<AccumulatorT>::max());
   // find the max over all batches
-  float max_k =
-    blockReduce<MaxFloat>(buffer, threadMax, MaxFloat(), -FLT_MAX);
+  AccumulatorT max_k = blockReduce<MaxFloat, AccumulatorT>(
+      buffer, threadMax, MaxFloat<AccumulatorT, AccumulatorT>(), -THCNumerics<AccumulatorT>::max());
+  T max_k_non_accum = ScalarConvert<AccumulatorT, T>::to(max_k);
 
-  float threadExp =
-    ilpReduce<SumExpFloat, ILP>(input, classes, SumExpFloat(max_k), 0.0f);
-  float logsum_k =
-    blockReduce<SumFloat, LSMFinal>(
-      buffer, threadExp, SumFloat(), 0.0f, LSMFinal(max_k));
+  AccumulatorT threadExp = ilpReduce<SumExpFloat, ILP, T, AccumulatorT>(
+      input, classes, SumExpFloat<T, AccumulatorT>(max_k_non_accum), 0.0);
+  T logsum_k = ScalarConvert<AccumulatorT, T>::to(
+      blockReduce<SumFloat, LSMFinal, AccumulatorT>(
+          buffer, threadExp, SumFloat<AccumulatorT, AccumulatorT>(), 0.0, LSMFinal<AccumulatorT>(max_k)));
 
   // Output LSM (hand ILP)
   int offset = threadIdx.x;
@@ -185,7 +194,7 @@ cunn_LogSoftMax_updateOutput_kernel(float *output, float *input, int classes)
   int last = classes % (ILP * blockDim.x);
   for (; offset < classes - last; offset += blockDim.x * ILP)
   {
-    float tmp[ILP];
+    T tmp[ILP];
 
 #pragma unroll
     for (int j = 0; j < ILP; ++j) {
@@ -205,30 +214,32 @@ cunn_LogSoftMax_updateOutput_kernel(float *output, float *input, int classes)
   }
 }
 
-template <int ILP>
+template <int ILP, typename T, typename AccumulatorT>
 __global__ void
-cunn_LogSoftMax_updateGradInput_kernel(float *gradInput,
-                                       float *output,
-                                       float *gradOutput,
+cunn_LogSoftMax_updateGradInput_kernel(T *gradInput,
+                                       T *output,
+                                       T *gradOutput,
                                        int classes)
 {
-  extern __shared__ float buffer[];
+  SharedMem<AccumulatorT> smem;
+  AccumulatorT *buffer = smem.getPointer();
   gradInput += blockIdx.x * classes;
   output += blockIdx.x * classes;
   gradOutput += blockIdx.x * classes;
 
-  float threadSum =
-    ilpReduce<SumFloat, 4>(gradOutput, classes, SumFloat(), 0.0f);
-  float sum_k =
-    blockReduce<SumFloat>(buffer, threadSum, SumFloat(), 0.0f);
+  AccumulatorT threadSum = ilpReduce<SumFloat, 4, T, AccumulatorT>(
+      gradOutput, classes, SumFloat<T, AccumulatorT>(), 0.0);
+  T sum_k = ScalarConvert<AccumulatorT, T>::to(
+      blockReduce<SumFloat, AccumulatorT>(
+          buffer, threadSum, SumFloat<AccumulatorT, AccumulatorT>(), 0.0));
 
   // Update gradInput (hand ILP)
   int offset = threadIdx.x;
   int last = classes % (ILP * blockDim.x);
   for (; offset < classes - last; offset += blockDim.x * ILP)
   {
-    float tmpGradOutput[ILP];
-    float tmpOutput[ILP];
+    T tmpGradOutput[ILP];
+    T tmpOutput[ILP];
 
 #pragma unroll
     for (int j = 0; j < ILP; ++j)
@@ -241,92 +252,16 @@ cunn_LogSoftMax_updateGradInput_kernel(float *gradInput,
     for (int j = 0; j < ILP; ++j)
     {
       gradInput[offset + j * blockDim.x] =
-        tmpGradOutput[j] - __expf(tmpOutput[j]) * sum_k;
+        tmpGradOutput[j] - fastExpIfAvail(tmpOutput[j]) * sum_k;
     }
   }
 
   for (; offset < classes; offset += blockDim.x)
   {
     gradInput[offset] =
-      gradOutput[offset] - __expf(output[offset]) * sum_k;
+      gradOutput[offset] - fastExpIfAvail(output[offset]) * sum_k;
   }
 }
 
-void THNN_CudaLogSoftMax_updateOutput(THCState *state, THCudaTensor *input, THCudaTensor *output)
-{
-  THCUNN_assertSameGPU(state, 2, input, output);
-
-  input = THCudaTensor_newContiguous(state, input);
-  THCudaTensor_resizeAs(state, output, input);
-
-  int batchSize = 1;
-  int classSize = 0;
-
-  if (THCudaTensor_nDimension(state, input) == 1)
-  {
-    classSize = THCudaTensor_size(state, input, 0);
-  }
-  else if (THCudaTensor_nDimension(state, input) == 2)
-  {
-    batchSize = THCudaTensor_size(state, input, 0);
-    classSize = THCudaTensor_size(state, input, 1);
-  }
-  else
-  {
-    THError("vector or matrix expected");
-  }
-
-  dim3 grid(batchSize);
-  dim3 block(1024);
-
-  cunn_LogSoftMax_updateOutput_kernel<2>
-    <<<grid, block, block.x * sizeof(float), THCState_getCurrentStream(state)>>>(
-      THCudaTensor_data(state, output),
-      THCudaTensor_data(state, input),
-      classSize
-  );
-  THCudaCheck(cudaGetLastError());
-  THCudaTensor_free(state, input);
-}
-
-void THNN_CudaLogSoftMax_updateGradInput(THCState *state, THCudaTensor *input, THCudaTensor *gradOutput,
-  THCudaTensor *gradInput, THCudaTensor *output)
-{
-  THCUNN_assertSameGPU(state, 3, output, gradOutput, gradInput);
-
-  output = THCudaTensor_newContiguous(state, output);
-  gradOutput = THCudaTensor_newContiguous(state, gradOutput);
-
-  THCudaTensor_resizeAs(state, gradInput, output);
-
-  int batchSize = 1;
-  int classSize = 0;
-
-  if (THCudaTensor_nDimension(state, gradInput) == 1)
-  {
-    classSize = THCudaTensor_size(state, gradInput, 0);
-  }
-  else if (THCudaTensor_nDimension(state, gradInput) == 2)
-  {
-    batchSize = THCudaTensor_size(state, gradInput, 0);
-    classSize = THCudaTensor_size(state, gradInput, 1);
-  }
-  else
-  {
-    THError("vector or matrix expected");
-  }
-
-  dim3 grid(batchSize);
-  dim3 block(1024);
-
-  cunn_LogSoftMax_updateGradInput_kernel<2>
-    <<<grid, block, block.x * sizeof(float), THCState_getCurrentStream(state)>>>(
-      THCudaTensor_data(state, gradInput),
-      THCudaTensor_data(state, output),
-      THCudaTensor_data(state, gradOutput),
-      classSize
-  );
-  THCudaCheck(cudaGetLastError());
-  THCudaTensor_free(state, gradOutput);
-  THCudaTensor_free(state, output);
-}
+#include "generic/LogSoftMax.cu"
+#include "THCGenerateFloatTypes.h"

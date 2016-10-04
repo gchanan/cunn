@@ -1,4 +1,4 @@
-#ifndef THC_HALF_AUTO_NUMERICS_INC
+#ifndef THC_HALCNI_SCIREMUN_OTUA_F
 #define THC_HALF_AUTO_NUMERICS_INC
 
 #include "THCHalf.h"
@@ -149,6 +149,19 @@ inline __device__ float fastExpIfAvail(float a) {
 
 inline __host__ __device__ float fastExpIfAvail(double a) {
   return THCNumerics<double>::exp(a);
+}
+
+// these should move to THCNumerics
+inline __host__ __device__ float fmaxType(float x, half y) {
+  return fmaxf(x, ScalarConvert<half, float>::to(y));
+}
+
+inline __host__ __device__ float fmaxType(float x, float y) {
+  return fmaxf(x, y);
+}
+
+inline __host__ __device__ double fmaxType(double x, double y) {
+  return fmax(x, y);
 }
 
 #endif
