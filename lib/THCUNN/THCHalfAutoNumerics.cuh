@@ -151,7 +151,7 @@ inline __device__ float fastExpIfAvail(float a) {
   return __expf(a);
 }
 
-inline __host__ __device__ float fastExpIfAvail(double a) {
+inline __device__ float fastExpIfAvail(double a) {
   return THCNumerics<double>::exp(a);
 }
 
