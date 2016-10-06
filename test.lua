@@ -25,113 +25,133 @@ local function checkHalf()
 end
 
 -- half has additional error on top of double/float
-local function precision_forward_type(tensor_type)
+local function precision_forward_type(precision_f, tensor_type)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 1e-2 + precision_forward;
+      return 1e-2 + precision_f
    else
-      return precision_forward
+      return precision_f
    end
 end
 
-local function precision_backward_type(tensor_type)
+local function precision_backward_type(precision_b, tensor_type)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 1e-2 + precision_backward;
+      return 1e-2 + precision_b;
    else
-      return precision_backward
+      return precision_b
    end
 end
 
 local function pointwise_forward(proto_module, name, max_error)
    local size = math.random(1,100)
+   local input = torch.FloatTensor():randn(size)
 
-   local tm = {}
-   local title = string.format(name..'.forward %d -> %d', size, size)
-   times[title] = tm
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format(name..'.forward (%s) %d -> %d', typename, size, size)
+      times[title] = tm
 
-   local input = torch.randn(size)
-   if name == 'Sqrt' then input:abs() end
-   local sconv = proto_module
-   local groundtruth = sconv:forward(input)
-   local a = torch.Timer()
-   for i = 1,nloop do
-      groundtruth = sconv:forward(input)
-   end
-   tm.cpu = a:time().real
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      if name == 'Sqrt' then input:abs() end
+      local sconv = proto_module:type(ctype)
+      local groundtruth = sconv:forward(input)
+      local a = torch.Timer()
+      for i = 1,nloop do
+        groundtruth = sconv:forward(input)
+      end
+      tm.cpu = a:time().real
 
-   input = input:cuda()
-   local gconv = proto_module:clone():cuda()
-   local rescuda = gconv:forward(input)
-   a:reset()
-   for i = 1,nloop do
-      rescuda = gconv:forward(input)
-   end
-   cutorch.synchronize()
-   tm.gpu = a:time().real
+      input = input:type(typename)
+      local gconv = proto_module:clone():type(typename)
+      local rescuda = gconv:forward(input)
+      a:reset()
+      for i = 1,nloop do
+        rescuda = gconv:forward(input)
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-   local error = rescuda:float() - groundtruth
-   mytester:assertlt(error:abs():max(), max_error, 'error on state (forward) ')
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(max_error, typename),
+        string.format('error on state (forward) with %s', typename))
+    end
 end
 
 local function pointwise_backward(proto_module, name, max_error)
    local size = math.random(1,100)
+   local input = torch.FloatTensor():randn(size)
+   local gradOutput = torch.FloatTensor():randn(size)
 
-   local tm = {}
-   local title = string.format(name..'.backward %d -> %d', size, size)
-   times[title] = tm
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format(name..'.backward (%s) %d -> %d', typename, size, size)
+      times[title] = tm
 
-   local input = torch.randn(size)
-   if name == 'Sqrt' then input:abs() end
-   local gradOutput = torch.randn(size)
-   local sconv = proto_module
-   sconv:forward(input)
-   local groundgrad = sconv:backward(input, gradOutput)
-   local a = torch.Timer()
-   for i = 1,nloop do
-      groundgrad = sconv:backward(input, gradOutput)
-   end
-   tm.cpu = a:time().real
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local gradOutput = gradOutput:type(ctype)
+      if name == 'Sqrt' then input:abs() end
+      local sconv = proto_module:type(ctype)
+      sconv:forward(input)
+      local groundgrad = sconv:backward(input, gradOutput)
+      local a = torch.Timer()
+      for i = 1,nloop do
+        groundgrad = sconv:backward(input, gradOutput)
+      end
+      tm.cpu = a:time().real
 
-   input = input:cuda()
-   gradOutput = gradOutput:cuda()
-   local gconv = proto_module:clone():cuda()
-   gconv:forward(input)
-   local rescuda = gconv:backward(input, gradOutput)
-   a:reset()
-   for i = 1,nloop do
-      rescuda = gconv:backward(input, gradOutput)
-   end
-   cutorch.synchronize()
-   tm.gpu = a:time().real
+      input = input:type(typename)
+      gradOutput = gradOutput:type(typename)
+      local gconv = proto_module:clone():type(typename)
+      gconv:forward(input)
+      local rescuda = gconv:backward(input, gradOutput)
+      a:reset()
+      for i = 1,nloop do
+        rescuda = gconv:backward(input, gradOutput)
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-   local error = rescuda:float() - groundgrad
+      local error = rescuda:double() - groundgrad:double()
 
-   mytester:assertlt(error:abs():max(), max_error, 'error on state (backward) ')
+      mytester:assertlt(error:abs():max(), precision_backward_type(max_error, typename),
+        string.format('error on state (backward) with %s', typename))
+    end
 end
 
 local function pointwise_backward_inplace(proto_module, name)
    local size = math.random(1,100)
 
-   local tm = {}
-   local title = string.format(name..'.backward_inplace %d -> %d', size, size)
-   times[title] = tm
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format(name..'.backward_inplace (%s) %d -> %d', typename, size, size)
+      times[title] = tm
 
-   local input = torch.randn(size)
-   if name == 'Sqrt' then input:abs() end
-   local gradOutput = torch.randn(size)
-   local sconv = proto_module
-   local groundgrad = sconv:backward(input, gradOutput)
-   mytester:assertTensorEq(groundgrad:float(),
-                           gradOutput:float(),
-                           0.000001, "inplace not respected")
+      local input = torch.FloatTensor():randn(size)
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      if name == 'Sqrt' then input:abs() end
+      local gradOutput = torch.FloatTensor():randn(size)
+      gradOutput = gradOutput:type(ctype)
+      local sconv = proto_module:type(ctype)
+      local groundgrad = sconv:backward(input, gradOutput)
+      mytester:assertTensorEq(groundgrad:double(),
+                              gradOutput:double(),
+                              0.000001,
+                              string.format("inplace not respected for %s", ctype))
 
-   local input = torch.randn(size):cuda()
-   if name == 'Sqrt' then input:abs() end
-   local gradOutput = torch.randn(size):cuda()
-   local sconv = proto_module:clone():cuda()
-   local groundgrad = sconv:backward(input, gradOutput)
-   mytester:assertTensorEq(groundgrad:float(),
-                           gradOutput:float(),
-                           0.000001, "cuda inplace not respected")
+      input = torch.FloatTensor():randn(size)
+      input = input:type(typename)
+      if name == 'Sqrt' then input:abs() end
+      gradOutput = torch.FloatTensor():randn(size)
+      gradOutput = gradOutput:type(typename)
+      local sconv = proto_module:clone():type(typename)
+      local groundgrad = sconv:backward(input, gradOutput)
+      mytester:assertTensorEq(groundgrad:double(),
+                              gradOutput:double(),
+                              0.000001,
+                              string.format("cuda inplace not respected for %s", typename))
+    end
 end
 
 local function pointwise_transposed(proto_module, name, max_error)
@@ -170,6 +190,49 @@ local function pointwise_transposed(proto_module, name, max_error)
    local error = gradInputCUDA:float() - gradInput
    mytester:assertlt(error:abs():max(), max_error,  'error on state (backward) ')
 end
+
+--[[local function pointwise_transposed(proto_module, name, max_error)
+   max_error = max_error or 1e-7
+
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format(name .. '.transposed %s', typename)
+      times[title] = tm
+
+      local input = torch.Tensor(11, 19):uniform(-1, 1)
+      if name == 'Sqrt' then
+        input:uniform(0.1, 1)
+      end
+      local inputCUDA = input:clone():cuda()
+
+      local cuda_module = proto_module:clone():cuda()
+
+      -- transpose the inputs and DON'T make contiguous
+      input = input:transpose(1, 2)
+      inputCUDA = inputCUDA:transpose(1, 2)
+
+      local output = proto_module:forward(input)
+      local outputCUDA = cuda_module:forward(inputCUDA)
+
+      local error = outputCUDA:double() - output:double()
+      mytester:assertlt(error:abs():max(), max_error,
+        string.format('error on state (forward) for %s', typename))
+
+      local gradOutput = torch.Tensor(11, 19):uniform(-1, 1)
+      local gradOutputCUDA = gradOutput:clone():cuda()
+
+      gradOutput = gradOutput:transpose(1, 2)
+      gradOutputCUDA = gradOutputCUDA:transpose(1, 2)
+
+      local gradInput = proto_module:backward(input, gradOutput)
+      local gradInputCUDA  = cuda_module:backward(inputCUDA, gradOutputCUDA)
+
+      local error = gradInputCUDA:double() - gradInput:double()
+      mytester:assertlt(error:abs():max(), max_error,
+        string.format('error on state (backward) for %s', typename))
+    end
+end
+--]]
 
 function cunntest.Tanh_forward()
    pointwise_forward(nn.Tanh(), 'Tanh', precision_forward)
@@ -288,29 +351,32 @@ end
 function cunntest.Sqrt_zero()
    local size = math.random(1, 100)
 
-   -- Test zero inputs; we will avoid a div-by-zero by setting to zero
-   local module_gpu = nn.Sqrt():cuda()
-   local input_gpu = torch.CudaTensor(size, size):zero()
-   module_gpu:forward(input_gpu)
+   for k, typename in ipairs(typenames) do
+      -- Test zero inputs; we will avoid a div-by-zero by setting to zero
+      local module_gpu = nn.Sqrt():type(typename)
+      local input_gpu = torch.CudaTensor(size, size):zero():type(typename)
+      module_gpu:forward(input_gpu)
 
-   local gradOutput_gpu = torch.CudaTensor(size, size):fill(1)
-   local gradInput_gpu = module_gpu:backward(input_gpu, gradOutput_gpu)
+      local gradOutput_gpu = torch.CudaTensor(size, size):fill(1):type(typename)
+      local gradInput_gpu = module_gpu:backward(input_gpu, gradOutput_gpu)
 
-   mytester:assertTensorEq(gradInput_gpu:float(),
-                           torch.FloatTensor(size, size):zero(),
-                           0.000001, "error in sqrt backward singularity")
+      mytester:assertTensorEq(gradInput_gpu:double(),
+                              torch.DoubleTensor(size, size):zero(),
+                              0.000001, "error in sqrt backward singularity")
 
-   -- Verify CPU and GPU zero behavior equivalency
-   local module_cpu = nn.Sqrt()
-   local input_cpu = input_gpu:float()
-   module_cpu:forward(input_cpu)
+      -- Verify CPU and GPU zero behavior equivalency
+      local ctype = t2cpu[typename]
+      local module_cpu = nn.Sqrt():type(ctype)
+      local input_cpu = input_gpu:type(ctype)
+      module_cpu:forward(input_cpu)
 
-   local gradOutput_cpu = gradOutput_gpu:float()
-   local gradInput_cpu = module_cpu:backward(input_cpu, gradOutput_cpu)
+      local gradOutput_cpu = gradOutput_gpu:type(ctype)
+      local gradInput_cpu = module_cpu:backward(input_cpu, gradOutput_cpu)
 
-   mytester:assertTensorEq(gradInput_gpu:float(),
-                           gradInput_cpu:float(),
-                           0.000001, "Sqrt_zero CPU and GPU not equivalent")
+      mytester:assertTensorEq(gradInput_gpu:double(),
+                            gradInput_cpu:double(),
+                            0.000001, "Sqrt_zero CPU and GPU not equivalent")
+    end
 end
 
 function cunntest.Sqrt_transposed()
@@ -397,68 +463,79 @@ end
 function cunntest.LogSoftMax_forward_batch()
    local size = math.random(1,256)
    local bs = math.random(32,256)
+   local input = torch.FloatTensor():randn(bs, size)
 
-   local tm = {}
-   local title = string.format('LogSoftMax forward batch %d x %d -> %d x %d', bs, size, bs, size)
-   times[title] = tm
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format('LogSoftMax forward batch (%s) %d x %d -> %d x %d', typename, bs, size, bs, size)
+      times[title] = tm
 
-   local input = torch.randn(bs, size)
-   local sconv = nn.LogSoftMax()
-   local groundtruth = sconv:forward(input)
-   local a = torch.Timer()
-   for i = 1,nloop do
-      groundtruth = sconv:forward(input)
-   end
-   tm.cpu = a:time().real
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local sconv = nn.LogSoftMax():type(ctype)
+      local groundtruth = sconv:forward(input)
+      local a = torch.Timer()
+      for i = 1,nloop do
+        groundtruth = sconv:forward(input)
+      end
+      tm.cpu = a:time().real
 
-   input = input:cuda()
-   local gconv = nn.LogSoftMax():cuda()
-   local rescuda = gconv:forward(input)
-   a:reset()
-   for i = 1,nloop do
-      rescuda = gconv:forward(input)
-   end
-   cutorch.synchronize()
-   tm.gpu = a:time().real
+      input = input:type(typename)
+      local gconv = nn.LogSoftMax():type(typename)
+      local rescuda = gconv:forward(input)
+      a:reset()
+      for i = 1,nloop do
+        rescuda = gconv:forward(input)
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-   local error = rescuda:float() - groundtruth
-   mytester:assertlt(error:abs():max(), precision_forward*10, 'error on state (forward) ')
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward*10, typename),
+          string.format('error on state (forward) with %s', typename))
+    end
 end
 
 function cunntest.LogSoftMax_backward_batch()
    local size = math.random(1,256)
    local bs = math.random(32,256)
+   local input = torch.FloatTensor():randn(bs, size)
+   local gradOutput = torch.FloatTensor():randn(bs, size)
 
-   local tm = {}
-   local title = string.format('LogSoftMax.backward batch %d x %d -> %d x %d', bs, size, bs, size)
-   times[title] = tm
+   for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format('LogSoftMax.backward batch (%s) %d x %d -> %d x %d', typename, bs, size, bs, size)
+      times[title] = tm
 
-   local input = torch.randn(bs, size)
-   local gradOutput = torch.randn(bs, size)
-   local sconv = nn.LogSoftMax()
-   sconv:forward(input)
-   local groundgrad = sconv:backward(input, gradOutput)
-   local a = torch.Timer()
-   for i = 1,nloop do
-      groundgrad = sconv:backward(input, gradOutput)
-   end
-   tm.cpu = a:time().real
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local gradOutput = gradOutput:type(ctype)
+      local sconv = nn.LogSoftMax():type(ctype)
+      sconv:forward(input)
+      local groundgrad = sconv:backward(input, gradOutput)
+      local a = torch.Timer()
+      for i = 1,nloop do
+        groundgrad = sconv:backward(input, gradOutput)
+      end
+      tm.cpu = a:time().real
 
-   input = input:cuda()
-   gradOutput = gradOutput:cuda()
-   local gconv = sconv:clone():cuda()
-   gconv:forward(input)
-   local rescuda = gconv:backward(input, gradOutput)
-   a:reset()
-   for i = 1,nloop do
-      rescuda = gconv:backward(input, gradOutput)
-   end
-   cutorch.synchronize()
-   tm.gpu = a:time().real
+      input = input:type(typename)
+      gradOutput = gradOutput:type(typename)
+      local gconv = sconv:clone():type(typename)
+      gconv:forward(input)
+      local rescuda = gconv:backward(input, gradOutput)
+      a:reset()
+      for i = 1,nloop do
+        rescuda = gconv:backward(input, gradOutput)
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-   local error = rescuda:float() - groundgrad
+      local error = rescuda:double() - groundgrad:double()
 
-   mytester:assertlt(error:abs():max(), precision_backward, 'error on state (backward) ')
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+    end
 end
 
 function cunntest.Euclidean_forward_batch()
@@ -4132,7 +4209,7 @@ function cunntest.SoftPlus_forward()
       tm.gpu = a:time().real
 
       local error = rescuda:double() - groundtruth:double()
-      mytester:assertlt(error:abs():max(), precision_forward_type(typename),
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward,typename),
           string.format('error on state (forward) with %s', typename))
     end
 end
@@ -4172,7 +4249,7 @@ function cunntest.SoftPlus_backward()
       tm.gpu = a:time().real
 
       local error = rescuda:double() - groundgrad:double()
-      mytester:assertlt(error:abs():max(), precision_backward_type(typename),
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
           string.format('error on state (backward) with %s', typename))
     end
 end
@@ -5449,32 +5526,37 @@ function cunntest.PReLU_forward()
     local nOutputPlane = 8
     local w = math.random(1,100)
     local h = math.random(1,100)
+    local input = torch.FloatTensor():randn(nOutputPlane,h,w)
 
-    local tm = {}
-    local title = string.format('PReLU forward %d x %d', w, h)
-    times[title] = tm
+    for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format('PReLU forward (%s) %d x %d', typename, w, h)
+      times[title] = tm
 
-    local input = torch.randn(nOutputPlane,h,w)
-    local sconv = nn.PReLU(nOutputPlane)
-    local groundtruth = sconv:forward(input)
-    local a = torch.Timer()
-    for i = 1,nloop do
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local sconv = nn.PReLU(nOutputPlane):type(ctype)
+      local groundtruth = sconv:forward(input)
+      local a = torch.Timer()
+      for i = 1,nloop do
         groundtruth = sconv:forward(input)
-    end
-    tm.cpu = a:time().real
+      end
+      tm.cpu = a:time().real
 
-    input = input:cuda()
-    local gconv = sconv:cuda()
-    local rescuda = gconv:forward(input)
-    a:reset()
-    for i = 1,nloop do
+      input = input:type(typename)
+      local gconv = sconv:type(typename)
+      local rescuda = gconv:forward(input)
+      a:reset()
+      for i = 1,nloop do
         rescuda = gconv:forward(input)
-    end
-    cutorch.synchronize()
-    tm.gpu = a:time().real
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-    local error = rescuda:float() - groundtruth
-    mytester:assertlt(error:abs():max(), precision_forward, 'error on state')
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state with %s', typename))
+    end
 end
 
 function cunntest.PReLU_backward()
