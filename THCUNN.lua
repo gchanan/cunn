@@ -125,14 +125,19 @@ local function extract_function_names_and_real_args(s)
       local func_name = string.match(n, 'void THNN_%(([%a%d_]+)%)')
       local param_positions = find_positions(n, ',')
       local positions = {}
-      for x,y in ipairs(find_positions(n, "real")) do
+      for x,y in ipairs(find_positions(n, 'real')) do
+          local found = false
           for cn,cp in ipairs(param_positions) do
               if cp > y then
                 positions[#positions+1] = cn
+                found = true
                 break
               end
           end
+          -- it is the last param
+          if not found then positions[#positions+1] = #param_positions + 1 end
       end
+
    t[func_name] = positions
    end
    return t
