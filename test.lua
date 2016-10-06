@@ -35,7 +35,7 @@ end
 
 local function precision_backward_type(precision_b, tensor_type)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 1e-2 + precision_b;
+      return 1e-1 + precision_b
    else
       return precision_b
    end
@@ -5563,40 +5563,49 @@ function cunntest.PReLU_backward()
     local nOutputPlane = 8
     local w = math.random(1,10)
     local h = math.random(1,10)
+    local input = torch.FloatTensor():randn(nOutputPlane, h, w)
+    local gradOutput = torch.FloatTensor():randn(#input)
 
-    local tm = {}
-    local title = string.format('PReLU backward %d x %d', w, h)
-    times[title] = tm
+    for k, typename in ipairs(typenames) do
+        local tm = {}
+        local title = string.format('PReLU backward (%s) %d x %d', typename, w, h)
+        times[title] = tm
 
-    local input = torch.randn(nOutputPlane, h, w)
-    local gradOutput = torch.randn(#input)
-    local sconv = nn.PReLU(nOutputPlane)
-    local gconv = sconv:clone():cuda()
+        local ctype = t2cpu[typename]
+        local input = input:type(ctype)
+        local gradOutput = gradOutput:type(ctype)
+        local sconv = nn.PReLU(nOutputPlane):type(ctype)
+        local gconv = sconv:clone():type(typename)
 
-    sconv:forward(input)
-    local groundgrad = sconv:backward(input, gradOutput)
-    local a = torch.Timer()
-    for i = 1,nloop do
-        groundgrad = sconv:backward(input, gradOutput)
+        sconv:forward(input)
+        sconv:zeroGradParameters()
+        local groundgrad = sconv:backward(input, gradOutput)
+        local a = torch.Timer()
+        for i = 1,nloop do
+            groundgrad = sconv:backward(input, gradOutput)
+        end
+        tm.cpu = a:time().real
+
+        input = input:type(typename)
+        gradOutput = gradOutput:type(typename)
+        gconv:forward(input)
+        gconv:zeroGradParameters()
+        local rescuda = gconv:backward(input, gradOutput)
+        a:reset()
+        for i = 1,nloop do
+            rescuda = gconv:backward(input, gradOutput)
+        end
+        cutorch.synchronize()
+        tm.gpu = a:time().real
+
+        local err = rescuda:double() - groundgrad:double()
+        local weightGradError = gconv.gradWeight:double() - sconv.gradWeight:double()
+
+        mytester:assertlt(err:abs():max(), precision_backward_type(precision_backward, typename),
+            string.format('error on state %s', typename))
+        mytester:assertlt(weightGradError:abs():max(), precision_backward_type(precision_backward, typename),
+            string.format('error on weight %s', typename))
     end
-    tm.cpu = a:time().real
-
-    input = input:cuda()
-    gradOutput = gradOutput:cuda()
-    gconv:forward(input)
-    local rescuda = gconv:backward(input, gradOutput)
-    a:reset()
-    for i = 1,nloop do
-        rescuda = gconv:backward(input, gradOutput)
-    end
-    cutorch.synchronize()
-    tm.gpu = a:time().real
-
-    local err = rescuda:float() - groundgrad
-    local weightGradError = gconv.gradWeight:float() - sconv.gradWeight
-
-    mytester:assertlt(err:abs():max(), precision_backward, 'error on state')
-    mytester:assertlt(weightGradError:abs():max(), precision_backward, 'error on weight')
 end
 
 
@@ -5605,40 +5614,45 @@ function cunntest.RReLU_forward()
     local w = math.random(1,100)
     local h = math.random(1,100)
 
-    for _,train in ipairs({true,false}) do
-       for _,inplace in ipairs({false,true}) do
-          local tm = {}
-          local title = string.format('RReLU forward %d x %d (inplace: %s, train: %s)',
-             w, h, tostring(inplace), tostring(train))
-          times[title] = tm
+    for k, typename in ipairs(typenames) do
+       for _,train in ipairs({true,false}) do
+          for _,inplace in ipairs({false,true}) do
+              local tm = {}
+              local title = string.format('RReLU forward %d x %d (inplace: %s, train: %s)',
+                  w, h, tostring(inplace), tostring(train))
+              times[title] = tm
 
-          local input = torch.randn(nOutputPlane, h, w) - 0.5
-          local sconv = nn.RReLU(1/8, 1/3, inplace)
-          if not train then
-             sconv:evaluate()
-          end
-          local groundtruth = sconv:forward(input:clone())
-          local a = torch.Timer()
-          for i = 1,nloop do
-             groundtruth = sconv:forward(input:clone())
-          end
-          tm.cpu = a:time().real
+              local input = torch.FloatTensor():randn(nOutputPlane, h, w) - 0.5
+              local ctype = t2cpu[typename]
+              local input = input:type(ctype)
+              local sconv = nn.RReLU(1/8, 1/3, inplace):type(ctype)
+              if not train then
+                  sconv:evaluate()
+              end
+              local groundtruth = sconv:forward(input:clone())
+              local a = torch.Timer()
+              for i = 1,nloop do
+                  groundtruth = sconv:forward(input:clone())
+              end
+              tm.cpu = a:time().real
 
-          input = input:cuda()
-          local gconv = sconv:cuda()
-          local rescuda = gconv:forward(input:clone())
-          a:reset()
-          for i = 1,nloop do
-             rescuda = gconv:forward(input:clone())
-          end
-          cutorch.synchronize()
-          tm.gpu = a:time().real
+              input = input:type(typename)
+              local gconv = sconv:type(typename)
+              local rescuda = gconv:forward(input:clone())
+              a:reset()
+              for i = 1,nloop do
+                rescuda = gconv:forward(input:clone())
+              end
+              cutorch.synchronize()
+              tm.gpu = a:time().real
 
-          if not train then
-             local error = rescuda:float() - groundtruth
-             mytester:assertlt(error:abs():max(), precision_forward, 'error on state')
+              if not train then
+                  local error = rescuda:double() - groundtruth:double()
+                  mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+                      string.format('error on state %s', typename))
+              end
           end
-       end
+      end
     end
 end
 
