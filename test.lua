@@ -5526,32 +5526,37 @@ function cunntest.PReLU_forward()
     local nOutputPlane = 8
     local w = math.random(1,100)
     local h = math.random(1,100)
+    local input = torch.FloatTensor():randn(nOutputPlane,h,w)
 
-    local tm = {}
-    local title = string.format('PReLU forward %d x %d', w, h)
-    times[title] = tm
+    for k, typename in ipairs(typenames) do
+      local tm = {}
+      local title = string.format('PReLU forward (%s) %d x %d', typename, w, h)
+      times[title] = tm
 
-    local input = torch.randn(nOutputPlane,h,w)
-    local sconv = nn.PReLU(nOutputPlane)
-    local groundtruth = sconv:forward(input)
-    local a = torch.Timer()
-    for i = 1,nloop do
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local sconv = nn.PReLU(nOutputPlane):type(ctype)
+      local groundtruth = sconv:forward(input)
+      local a = torch.Timer()
+      for i = 1,nloop do
         groundtruth = sconv:forward(input)
-    end
-    tm.cpu = a:time().real
+      end
+      tm.cpu = a:time().real
 
-    input = input:cuda()
-    local gconv = sconv:cuda()
-    local rescuda = gconv:forward(input)
-    a:reset()
-    for i = 1,nloop do
+      input = input:type(typename)
+      local gconv = sconv:type(typename)
+      local rescuda = gconv:forward(input)
+      a:reset()
+      for i = 1,nloop do
         rescuda = gconv:forward(input)
-    end
-    cutorch.synchronize()
-    tm.gpu = a:time().real
+      end
+      cutorch.synchronize()
+      tm.gpu = a:time().real
 
-    local error = rescuda:float() - groundtruth
-    mytester:assertlt(error:abs():max(), precision_forward, 'error on state')
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state with %s', typename))
+    end
 end
 
 function cunntest.PReLU_backward()
