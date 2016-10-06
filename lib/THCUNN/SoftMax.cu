@@ -32,7 +32,7 @@ __global__ void cunn_SoftMax_updateOutput_kernel(
   // reduce
   if (threadIdx.x == 0)
   {
-    AccumuT max_k = -THCNumerics<AccumT>::max();
+    AccumT max_k = -THCNumerics<AccumT>::max();
     for (int i=0; i<blockDim.x; i++)
     {
       if (max_k < buffer[i])
