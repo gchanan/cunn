@@ -9,7 +9,7 @@ __global__ void MaxPoolForward(const int nthreads, const Dtype* bottom_data,
     const int kernel_h, const int kernel_w, const int stride_h,
     const int stride_w, const int pad_h, const int pad_w,
     const int dilation_h, const int dilation_w, Dtype* top_data,
-    Dtype* top_mask) {
+    long* top_mask) {
   CUDA_KERNEL_LOOP(index, nthreads) {
     int pw = index % pooled_width;
     int ph = (index / pooled_width) % pooled_height;
@@ -42,7 +42,7 @@ __global__ void MaxPoolForward(const int nthreads, const Dtype* bottom_data,
 
 template <typename Dtype>
 __global__ void MaxPoolBackward(const int nthreads, const Dtype* top_diff,
-    const Dtype* top_mask, const int num, const int channels,
+    const long* top_mask, const int num, const int channels,
     const int height, const int width, const int pooled_height,
     const int pooled_width, const int kernel_h, const int kernel_w,
     const int stride_h, const int stride_w, const int pad_h, const int pad_w,
@@ -61,7 +61,7 @@ __global__ void MaxPoolBackward(const int nthreads, const Dtype* top_diff,
     int pwstart =
         (w + pad_w < ((kernel_w - 1) * dilation_w + 1)) ? 0 : (w + pad_w - ((kernel_w - 1) * dilation_w + 1)) / stride_w + 1;
     int pwend = min((w + pad_w) / stride_w + 1, pooled_width);
-    
+
     Dtype gradient = 0;
     int offset = (n * channels + c) * pooled_height * pooled_width;
     top_diff += offset;
@@ -77,7 +77,7 @@ __global__ void MaxPoolBackward(const int nthreads, const Dtype* top_diff,
   }
 }
 
-void THNN_CudaSpatialDilatedMaxPooling_updateOutput(THCState *state, THCudaTensor *input, THCudaTensor *output, THCudaTensor *indices, int kW, int kH, int dW, int dH, int padW, int padH, int dilationW, int dilationH, bool ceil_mode)
+void THNN_CudaSpatialDilatedMaxPooling_updateOutput(THCState *state, THCudaTensor *input, THCudaTensor *output, THCudaLongTensor *indices, int kW, int kH, int dW, int dH, int padW, int padH, int dilationW, int dilationH, bool ceil_mode)
 {
 
   THCUNN_assertSameGPU(state, 3, input, output, indices);
@@ -129,9 +129,9 @@ if (padW || padH)
   float* input_data = THCudaTensor_data(state, input);
 
   THCudaTensor_resize4d(state, output, batchSize, nInputPlane, nOutputRows, nOutputCols);
-  THCudaTensor_resizeAs(state, indices, output);
+  THCUNN_resizeAs_indices(state, indices, output);
 
-  float* indices_data = THCudaTensor_data(state, indices);
+  long* indices_data = THCudaLongTensor_data(state, indices);
   float* output_data = THCudaTensor_data(state, output);
 
   int count = THCudaTensor_nElement(state, output);
@@ -148,7 +148,7 @@ if (padW || padH)
   THCudaTensor_free(state, input);
 }
 
-void THNN_CudaSpatialDilatedMaxPooling_updateGradInput(THCState *state, THCudaTensor *input, THCudaTensor *gradOutput, THCudaTensor *gradInput, THCudaTensor *indices, int kW, int kH, int dW, int dH, int padW, int padH, int dilationW, int dilationH, bool ceil_mode)
+void THNN_CudaSpatialDilatedMaxPooling_updateGradInput(THCState *state, THCudaTensor *input, THCudaTensor *gradOutput, THCudaTensor *gradInput, THCudaLongTensor *indices, int kW, int kH, int dW, int dH, int padW, int padH, int dilationW, int dilationH, bool ceil_mode)
 {
   THCUNN_assertSameGPU(state, 4, input, gradOutput, indices, gradInput);
 
@@ -193,7 +193,7 @@ void THNN_CudaSpatialDilatedMaxPooling_updateGradInput(THCState *state, THCudaTe
   MaxPoolBackward <<< GET_BLOCKS(count), CUDA_NUM_THREADS, 0, THCState_getCurrentStream(state) >>>
       (count,
       THCudaTensor_data(state, gradOutput),
-      THCudaTensor_data(state, indices),
+      THCudaLongTensor_data(state, indices),
       batchSize, nInputPlane, nInputRows, nInputCols, nOutputRows, nOutputCols,
       kH, kW, dH, dW, padH, padW, dilationH, dilationW,
       THCudaTensor_data(state, gradInput));
