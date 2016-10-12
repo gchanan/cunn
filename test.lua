@@ -2337,58 +2337,67 @@ function cunntest.SpatialMaxUnpooling_forward_batch()
    mytester:assertlt(error:abs():max(), precision_forward, 'error on state (forward) ')
 end
 
-function cunntest.SpatialMaxPooling_backward()
+function cunntest.SpatialMaxPooling_backward2()
    local from = math.random(1,64)
    local to = from
    local ki = math.random(2,4)
    local kj = math.random(2,4)
    local si = math.random(1,4)
    local sj = math.random(1,4)
-   local outi = math.random(32,64)
-   local outj = math.random(32,64)
+   local outi = math.random(6,25)
+   local outj = math.random(6,25)
    local padi = math.random(0,ki/2-1)
    local padj = math.random(0,kj/2-1)
    local ini = (outi-1)*si+ki - padi*2
    local inj = (outj-1)*sj+kj - padj*2
-   local ceil_mode = math.random(0,1) == 1
-
-   local tm = {}
-   local title = string.format('SpatialMaxPooling.backward %dx%dx%d o %dx%d -> %dx%dx%d',
-                               from, inj, ini, kj, ki, to, outj, outi)
-   times[title] = tm
+   local ceil_mode = true--math.random(0,1) == 1
 
    local input = torch.randn(from,inj,ini)
    local gradOutput = torch.randn(to,outj,outi)
-   local sconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj)
-   if ceil_mode then sconv:ceil() end
-   sconv:forward(input)
-   sconv:zeroGradParameters()
-   local groundgrad = sconv:backward(input, gradOutput)
-   local a = torch.Timer()
-   for i = 1,nloop do
+
+   for k, typename in ipairs(typenames) do
+      print('doing typename', typename)
+      local ctype = t2cpu[typename]
+      local input = input:type(ctype)
+      local gradOutput = gradOutput:type(ctype)
+      print (gradOutput)
+      print('foobaz!')
+      print(gradOutput:sub(12,12,10,10,12,12))
+
+      print('params: ', ki, kj, si, sj, padi, padj)
+      local sconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj):type(ctype)
+      if ceil_mode then sconv:ceil() end
+      local output = sconv:forward(input)
       sconv:zeroGradParameters()
-      groundgrad = sconv:backward(input, gradOutput)
-   end
-   tm.cpu = a:time().real
-
-   input = input:cuda()
-   gradOutput = gradOutput:cuda()
-   local gconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj):cuda()
-   if ceil_mode then gconv:ceil() end
-   gconv:forward(input)
-   gconv:zeroGradParameters()
-   local rescuda = gconv:backward(input, gradOutput)
-   a:reset()
-   for i = 1,nloop do
+      print(ceil_mode)
+      print(from, inj, ini)
+      print(to, outj, outi)
+      print(#input)
+      print(#output)
+      print(#gradOutput)
+      local groundgrad = sconv:backward(input, gradOutput)
+      input = input:type(typename)
+      local foobar = gradOutput:type(typename)
+      local error2 = foobar:double() - gradOutput:double()
+      mytester:assertlt(error2:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error2 on state (backward) with %s', typename))
+      gradOutput = foobar
+      local gconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj):type(typename)
+      if ceil_mode then gconv:ceil() end
+      gconv:forward(input)
       gconv:zeroGradParameters()
-      rescuda = gconv:backward(input, gradOutput)
-   end
-   cutorch.synchronize()
-   tm.gpu = a:time().real
+      local rescuda = gconv:backward(input, gradOutput)
 
-   local error = rescuda:float() - groundgrad
+      local error = rescuda:double() - groundgrad:double()
+      --print(error)
+      print("error", error:sub(12,12,37,37,34,35))
+      --print("rescudaFull", rescuda)
+      print("rescuda", rescuda:sub(12,12,37,37,34,35))
+      print("groudngrad", groundgrad:sub(12,12,37,37,34,35))
 
-   mytester:assertlt(error:abs():max(), precision_backward, 'error on state (backward) ')
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+    end
 end
 
 function cunntest.SpatialMaxPooling_backward_batch()
@@ -2587,25 +2596,30 @@ function cunntest.SpatialDilatedMaxPooling_forward_batch()
     end
 end
 
-function cunntest.SpatialDilatedMaxPooling_backward()
-   local from = math.random(1,64)
+function cunntest.SpatialDilatedMaxPooling_backward2()
+   local from = 1 -- math.random(1,30)
    local to = from
-   local ki = math.random(2,4)
-   local kj = math.random(2,4)
-   local si = math.random(1,4)
-   local sj = math.random(1,4)
+   local ki = 2 -- math.random(2,4)
+   local kj = 1 - math.random(2,4)
+   local si = 1 -- math.random(1,4)
+   local sj = 1 -- math.random(1,4)
    local outi = math.random(32,64)
    local outj = math.random(32,64)
-   local padi = math.random(0,ki/2-1)
-   local padj = math.random(0,kj/2-1)
-   local dilationi = math.random(1,10)
-   local dilationj = math.random(1,10)
+   local padi = 0 -- math.random(0,ki/2-1)
+   local padj = 0 -- math.random(0,kj/2-1)
+   local dilationi = 1 - math.random(1,2)
+   local dilationj = 1 -- math.random(1,2)
+   outi = 6
+   outj = 3
    local ini = (outi-1)*si+(dilationi*(ki-1)+1)-2*padi
    local inj = (outj-1)*sj+(dilationj*(kj-1)+1)-2*padj
    local ceil_mode = math.random(0,1) == 1
 
-   local input = torch.randn(from,inj,ini)
-   local gradOutput = torch.randn(to,outj,outi)
+   print(ini, inj)
+   local input = torch.range(1,from * inj * ini):view(from, inj, ini) -- torch.randn(from,inj,ini)
+   --local input = torch.randn(from, inj, ini)
+   print(input)
+   local gradOutput = torch.linspace(0,1,to * outj * outi):view(to, outj, outi) --torch.randn(to,outj,outi)
 
    for k, typename in ipairs(typenames) do
       local ctype = t2cpu[typename]
@@ -2613,8 +2627,10 @@ function cunntest.SpatialDilatedMaxPooling_backward()
       local gradOutput = gradOutput:type(ctype)
       local sconv = nn.SpatialDilatedMaxPooling(ki,kj,si,sj,padi,padj,dilationi,dilationj):type(ctype)
       if ceil_mode then sconv:ceil() end
-      sconv:forward(input)
+
+      local output = sconv:forward(input)
       sconv:zeroGradParameters()
+      output:isSameSizeAs(gradOutput)
       local groundgrad = sconv:backward(input, gradOutput)
 
       input = input:type(typename)
@@ -6411,7 +6427,11 @@ function nn.testcuda(tests, print_timing, n_loop, seed)
    local oldtype = torch.getdefaulttensortype()
    torch.setdefaulttensortype('torch.FloatTensor')
    checkHalf()
-   initSeed(seed)
+   --initSeed(456467605)
+   --initSeed(482528743)
+   --initSeed(629529231)
+   --initSeed(seed)
+   initSeed(945345500)
    mytester = torch.Tester()
    mytester:add(cunntest)
    mytester:run(tests)

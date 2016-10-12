@@ -97,9 +97,17 @@ void THNN_(SpatialDilatedMaxPooling_updateGradInput)(
            bool ceil_mode)
 {
   THCUNN_assertSameGPU_generic(state, 4, input, gradOutput, indices, gradInput);
-
+//print("rescuda", rescuda:sub(12,12,37,37,34,35)))
+  //real entry1 = THCTensor_(get3d)(state, gradOutput, 12,10,12);
+  //real entry2 = THCTensor_(get3d)(state, gradOutput, 12,37,35);(12,12,10,10,12,12))
+  //printf("entry (12,10,12) is: %f\n", ScalarConvert<real, accreal>::to(entry1));
+  //real entry1 = THCTensor_(get3d)(state, gradOutput, 11,9,11);
+  //printf("entry (12,10,12) is: %f\n", ScalarConvert<real, accreal>::to(entry1));
+  //printf("entry (12,37,35) is: %f\n", ScalarConvert<real, accreal>::to(entry2));
   input = THCTensor_(newContiguous)(state, input);
   gradOutput = THCTensor_(newContiguous)(state, gradOutput);
+  //entry1 = THCTensor_(get3d)(state, gradOutput, 11,9,11);
+  //printf("entry (12,10,12) is: %f\n", ScalarConvert<real, accreal>::to(entry1));
 
   long nInputCols, nInputRows, nInputPlane, batchSize;
   long nOutputCols, nOutputRows;
@@ -135,8 +143,10 @@ void THNN_(SpatialDilatedMaxPooling_updateGradInput)(
   THCTensor_(resizeAs)(state, gradInput, input);
 
   int count = THCTensor_(nElement)(state, input);
+  printf("COUNTS: %i %i", count, GET_BLOCKS(count));
 
   MaxPoolBackward<real, accreal> <<< GET_BLOCKS(count), CUDA_NUM_THREADS, 0, THCState_getCurrentStream(state) >>>
+  //MaxPoolBackward<real, accreal> <<< 1, 1, 0, THCState_getCurrentStream(state) >>>
       (count,
       THCTensor_(data)(state, gradOutput),
       THCudaLongTensor_data(state, indices),
