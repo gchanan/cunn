@@ -33,7 +33,7 @@ local replacements =
 {
    {
       ['THTensor'] = 'THCudaTensor',
-      ['THIndexTensor'] = 'THCudaLongTensor',
+      ['THCIndexTensor'] = 'THCudaLongTensor',
       ['THIndex_t'] = 'long',
       ['THInteger_t'] = 'float'
    }
@@ -48,13 +48,13 @@ local replacements_generic =
 {
   {
     ['THCTensor'] = 'THCudaTensor',
-    ['THIndexTensor'] = 'THCudaLongTensor',
+    ['THCIndexTensor'] = 'THCudaLongTensor',
     ['TYPE'] = 'Cuda',
     ['real'] = 'float'
   },
   {
     ['THCTensor'] = 'THCudaDoubleTensor',
-    ['THIndexTensor'] = 'THCudaLongTensor',
+    ['THCIndexTensor'] = 'THCudaLongTensor',
     ['TYPE'] = 'CudaDouble',
     ['real'] = 'double',
    }

@@ -161,36 +161,36 @@ __global__ void cunn_LookupTable_accGradParametersKernel(
 
 void THNN_CudaLookupTable_accGradParameters(
   THCState *state,
-  THIndexTensor *input,
+  THCIndexTensor *input,
   THCudaTensor *gradOutput,
   THCudaTensor *gradWeight,
-  THIndexTensor *count,
-  THIndexTensor *sorted,
-  THIndexTensor *indices,
+  THCIndexTensor *count,
+  THCIndexTensor *sorted,
+  THCIndexTensor *indices,
   bool scaleGradByFreq,
   int paddingValue,
   float scale)
 {
   THCUNN_assertSameGPU(state, 5, input, gradOutput, gradWeight, sorted, indices);
-  if (!(THIndexTensor_(isContiguous)(state, input) &&
+  if (!(THCIndexTensor_(isContiguous)(state, input) &&
         THCudaTensor_isContiguous(state, gradOutput) &&
         THCudaTensor_isContiguous(state, gradWeight)))
   {
     THError("Tensors must be contiguous");
   }
 
-  int nDim = THIndexTensor_(nDimension)(state, input);
+  int nDim = THCIndexTensor_(nDimension)(state, input);
   if (nDim != 1 && nDim != 2)
     THError("input must be a vector or matrix");
 
-  long numel = THIndexTensor_(nElement)(state, input);
+  long numel = THCIndexTensor_(nElement)(state, input);
   long stride = gradWeight->stride[0];
 
   cudaStream_t stream = THCState_getCurrentStream(state);
 
   if (numel <= 768 && !scaleGradByFreq) {
     cunn_LookupTable_accGradParametersKernelByFeature<<<DIVUP(stride,4), 128, 0, stream>>>(
-      THIndexTensor_(data)(state, input),
+      THCIndexTensor_(data)(state, input),
       THCudaTensor_data(state, gradOutput),
       THCudaTensor_data(state, gradWeight),
       scale,
@@ -201,22 +201,22 @@ void THNN_CudaLookupTable_accGradParameters(
     return;
   }
 
-  THLongStorage *inputSize = THIndexTensor_(newSizeOf)(state, input);
-  THIndexTensor_(resize)(state, sorted, inputSize, NULL);
-  THIndexTensor_(resize)(state, indices, inputSize, NULL);
+  THLongStorage *inputSize = THCIndexTensor_(newSizeOf)(state, input);
+  THCIndexTensor_(resize)(state, sorted, inputSize, NULL);
+  THCIndexTensor_(resize)(state, indices, inputSize, NULL);
   THLongStorage_free(inputSize);
 
   // Sort the inputs into sorted with the corresponding indices
-  THIndexTensor_(sort)(state, sorted, indices, input, 0, 0);
+  THCIndexTensor_(sort)(state, sorted, indices, input, 0, 0);
 
-  long *sorted_data = THIndexTensor_(data)(state, sorted);
-  long  *indices_data = THIndexTensor_(data)(state, indices);
+  long *sorted_data = THCIndexTensor_(data)(state, sorted);
+  long  *indices_data = THCIndexTensor_(data)(state, indices);
   long *count_data = NULL;
 
   if (scaleGradByFreq)
   {
-    THIndexTensor_(resizeAs)(state, count, input);
-    count_data = THIndexTensor_(data)(state, count);
+    THCIndexTensor_(resizeAs)(state, count, input);
+    count_data = THCIndexTensor_(data)(state, count);
 
     thrust::device_ptr<long> sorted_ptr(sorted_data);
     thrust::device_ptr<long> count_ptr(count_data);
@@ -298,28 +298,28 @@ struct multiply_s
 
 void THNN_CudaLookupTable_renorm(
   THCState *state,
-  THIndexTensor *idx,
+  THCIndexTensor *idx,
   THCudaTensor *weight,
   float maxNorm,
   float normType)
 {
   THCUNN_assertSameGPU(state, 2, idx, weight);
-  if (!(THIndexTensor_(isContiguous)(state, idx) &&
+  if (!(THCIndexTensor_(isContiguous)(state, idx) &&
         THCudaTensor_isContiguous(state, weight)))
   {
     THError("Tensors must be contiguous");
   }
-  if (THIndexTensor_(nDimension)(state, idx) != 1)
+  if (THCIndexTensor_(nDimension)(state, idx) != 1)
     THError("idx must be a vector");
   if (normType <= 0)
     THError("non-positive-norm not supported");
 
-  long numel = THIndexTensor_(nElement)(state, idx);
+  long numel = THCIndexTensor_(nElement)(state, idx);
   long stride = weight->stride[0];
 
   // get the unique indices
   thrust::device_ptr<float> weight_ptr(THCudaTensor_data(state, weight));
-  thrust::device_ptr<long> idx_ptr(THIndexTensor_(data)(state, idx));
+  thrust::device_ptr<long> idx_ptr(THCIndexTensor_(data)(state, idx));
   thrust::device_ptr<long> end_ptr = thrust::unique(idx_ptr, idx_ptr+numel);
   numel = end_ptr - idx_ptr;
 
