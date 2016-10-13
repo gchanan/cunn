@@ -3,6 +3,7 @@
 
 #define THCIndexTensor THCudaLongTensor
 #define THCIndexTensor_(NAME) THCudaLongTensor_ ## NAME
+typedef long THCIndex_t;
 
 #define THNN_(NAME) TH_CONCAT_3(THNN_, CReal, NAME)
 
@@ -476,7 +477,7 @@ TH_API void THNN_CudaSpatialAdaptiveMaxPooling_updateOutput(
           THCState *state,
           THCudaTensor *input,
           THCudaTensor *output,
-          THCudaLongTensor *indices,
+          THCIndexTensor *indices,
           int nOutputCols,
           int nOutputRows);
 TH_API void THNN_CudaSpatialAdaptiveMaxPooling_updateGradInput(
@@ -484,7 +485,7 @@ TH_API void THNN_CudaSpatialAdaptiveMaxPooling_updateGradInput(
           THCudaTensor *input,
           THCudaTensor *gradOutput,
           THCudaTensor *gradInput,
-          THCudaLongTensor *indices);
+          THCIndexTensor *indices);
 
 TH_API void THNN_CudaSpatialAveragePooling_updateOutput(
           THCState *state,
