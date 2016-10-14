@@ -209,17 +209,17 @@ void THNN_CudaLookupTable_accGradParameters(
   // Sort the inputs into sorted with the corresponding indices
   THCIndexTensor_(sort)(state, sorted, indices, input, 0, 0);
 
-  long *sorted_data = THCIndexTensor_(data)(state, sorted);
-  long  *indices_data = THCIndexTensor_(data)(state, indices);
-  long *count_data = NULL;
+  THCIndex_t *sorted_data = THCIndexTensor_(data)(state, sorted);
+  THCIndex_t  *indices_data = THCIndexTensor_(data)(state, indices);
+  THCIndex_t *count_data = NULL;
 
   if (scaleGradByFreq)
   {
     THCIndexTensor_(resizeAs)(state, count, input);
     count_data = THCIndexTensor_(data)(state, count);
 
-    thrust::device_ptr<long> sorted_ptr(sorted_data);
-    thrust::device_ptr<long> count_ptr(count_data);
+    thrust::device_ptr<THCIndex_t> sorted_ptr(sorted_data);
+    thrust::device_ptr<THCIndex_t> count_ptr(count_data);
 
     // Compute an increasing sequence per unique item in sorted:
     // sorted: 2 5 5 5 7 7 8 9 9
@@ -314,13 +314,13 @@ void THNN_CudaLookupTable_renorm(
   if (normType <= 0)
     THError("non-positive-norm not supported");
 
-  long numel = THCIndexTensor_(nElement)(state, idx);
+  THCIndex_t numel = THCIndexTensor_(nElement)(state, idx);
   long stride = weight->stride[0];
 
   // get the unique indices
   thrust::device_ptr<float> weight_ptr(THCudaTensor_data(state, weight));
-  thrust::device_ptr<long> idx_ptr(THCIndexTensor_(data)(state, idx));
-  thrust::device_ptr<long> end_ptr = thrust::unique(idx_ptr, idx_ptr+numel);
+  thrust::device_ptr<THCIndex_t> idx_ptr(THCIndexTensor_(data)(state, idx));
+  thrust::device_ptr<THCIndex_t> end_ptr = thrust::unique(idx_ptr, idx_ptr+numel);
   numel = end_ptr - idx_ptr;
 
   pow_v<float> unary_pow(normType);
@@ -328,7 +328,7 @@ void THNN_CudaLookupTable_renorm(
   // numel << stride, since idx usually contains sparse row indices
   for (long i = 0; i < numel; i++)
   {
-    long k = idx_ptr[i] - TH_INDEX_BASE;
+    THCIndex_t k = idx_ptr[i] - TH_INDEX_BASE;
     thrust::device_ptr<float> row_ptr = weight_ptr + k * stride;
     float norm = thrust::transform_reduce(row_ptr, row_ptr + stride,
       unary_pow, 0, binary_plus);

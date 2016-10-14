@@ -108,7 +108,7 @@ __global__ void cunn_ClassNLLCriterion_updateGradInput_kernel(
 }
 
 void THNN_CudaClassNLLCriterion_updateOutput(THCState *state, THCudaTensor *input, THCIndexTensor *target, THCudaTensor *output, bool sizeAverage, THCudaTensor *weights, THCudaTensor *total_weight) {
-  if (THCIndexTensor_nDimension(state, target) > 1) {
+  if (THCIndexTensor_(nDimension)(state, target) > 1) {
     THError("multi-target not supported");
   }
 
@@ -134,11 +134,11 @@ void THNN_CudaClassNLLCriterion_updateOutput(THCState *state, THCudaTensor *inpu
 
   input = THCudaTensor_newContiguous(state, input);
   weights = weights ? THCudaTensor_newContiguous(state, weights) : NULL;
-  target = THCIndexTensor_newContiguous(state, target);
+  target = THCIndexTensor_(newContiguous)(state, target);
 
   float *input_data = THCudaTensor_data(state, input);
   float *weights_data = weights ? THCudaTensor_data(state, weights) : NULL;
-  THCIndex_t  *target_data = THCIndexTensor_data(state, target);
+  THCIndex_t  *target_data = THCIndexTensor_(data)(state, target);
   float *output_data = THCudaTensor_data(state, output);
   float *total_weight_data = THCudaTensor_data(state, total_weight);
 
@@ -173,12 +173,12 @@ void THNN_CudaClassNLLCriterion_updateOutput(THCState *state, THCudaTensor *inpu
   if (weights) {
     THCudaTensor_free(state, weights);
   }
-  THCIndexTensor_free(state, target);
+  THCIndexTensor_(free)(state, target);
   THCudaTensor_free(state, input);
 }
 
 void THNN_CudaClassNLLCriterion_updateGradInput(THCState *state, THCudaTensor *input, THCIndexTensor *target, THCudaTensor *gradInput, bool sizeAverage, THCudaTensor *weights, THCudaTensor *total_weight) {
-  if (THCIndexTensor_nDimension(state, target) > 1) {
+  if (THCIndexTensor_(nDimension)(state, target) > 1) {
     THError("multi-target not supported");
   }
 
@@ -206,11 +206,11 @@ void THNN_CudaClassNLLCriterion_updateGradInput(THCState *state, THCudaTensor *i
   }
 
   weights = weights ? THCudaTensor_newContiguous(state, weights) : NULL;
-  target = THCIndexTensor_newContiguous(state, target);
+  target = THCIndexTensor_(newContiguous)(state, target);
 
   float *weights_data = weights ? THCudaTensor_data(state, weights) : NULL;
   float *gradInput_data = THCudaTensor_data(state, gradInput);
-  THCIndex_t  *target_data = THCIndexTensor_data(state, target);
+  THCIndex_t  *target_data = THCIndexTensor_(data)(state, target);
   float *total_weight_data = THCudaTensor_data(state, total_weight);
 
   if (THCudaTensor_nDimension(state, input) == 1) {
@@ -241,5 +241,5 @@ void THNN_CudaClassNLLCriterion_updateGradInput(THCState *state, THCudaTensor *i
   if (weights) {
     THCudaTensor_free(state, weights);
   }
-  THCIndexTensor_free(state, target);
+  THCIndexTensor_(free)(state, target);
 }

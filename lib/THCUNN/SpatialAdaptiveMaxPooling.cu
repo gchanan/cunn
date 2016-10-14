@@ -206,9 +206,9 @@ void THNN_CudaSpatialAdaptiveMaxPooling_updateOutput(THCState *state, THCudaTens
     input_data = THCudaTensor_data(state, input);
 
     THCudaTensor_resize3d(state, output, nInputPlane, nOutputRows, nOutputCols);
-    THCIndexTensor_resize4d(state, indices, 2, nInputPlane, nOutputRows, nOutputCols);
+    THCIndexTensor_(resize4d)(state, indices, 2, nInputPlane, nOutputRows, nOutputCols);
 
-    indices_data = THCIndexTensor_data(state, indices);
+    indices_data = THCIndexTensor_(data)(state, indices);
     output_data = THCudaTensor_data(state, output);
 
     // cuda blocks & threads:
@@ -238,9 +238,9 @@ void THNN_CudaSpatialAdaptiveMaxPooling_updateOutput(THCState *state, THCudaTens
     input_data = THCudaTensor_data(state, input);
 
     THCudaTensor_resize4d(state, output, nbatch, nInputPlane, nOutputRows, nOutputCols);
-    THCIndexTensor_resize5d(state, indices, 2, nbatch, nInputPlane, nOutputRows, nOutputCols);
+    THCIndexTensor_(resize5d)(state, indices, 2, nbatch, nInputPlane, nOutputRows, nOutputCols);
 
-    indices_data = THCIndexTensor_data(state, indices);
+    indices_data = THCIndexTensor_(data)(state, indices);
     output_data = THCudaTensor_data(state, output);
 
     // cuda blocks & threads:
@@ -266,7 +266,7 @@ void THNN_CudaSpatialAdaptiveMaxPooling_updateGradInput(THCState *state, THCudaT
 
   THCUNN_assertSameGPU(state, 4, input, indices, gradOutput, gradInput);
 
-  THIndex_t *indices_data;
+  THCIndex_t *indices_data;
   float *gradInput_data;
   float *gradOutput_data;
 
@@ -284,7 +284,7 @@ void THNN_CudaSpatialAdaptiveMaxPooling_updateGradInput(THCState *state, THCudaT
     THCudaTensor_resizeAs(state, gradInput, input);
     THCudaTensor_zero(state, gradInput);
 
-    indices_data = THCIndexTensor_data(state, indices);
+    indices_data = THCIndexTensor_(data)(state, indices);
     gradOutput_data = THCudaTensor_data(state, gradOutput);
     gradInput_data = THCudaTensor_data(state, gradInput);
 
@@ -322,7 +322,7 @@ void THNN_CudaSpatialAdaptiveMaxPooling_updateGradInput(THCState *state, THCudaT
     THCudaTensor_resizeAs(state, gradInput, input);
     THCudaTensor_zero(state, gradInput);
 
-    indices_data = THCIndexTensor_data(state, indices);
+    indices_data = THCIndexTensor_(data)(state, indices);
     gradOutput_data = THCudaTensor_data(state, gradOutput);
     gradInput_data = THCudaTensor_data(state, gradInput);
 
