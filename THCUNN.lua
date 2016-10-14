@@ -65,7 +65,7 @@ if cutorch.hasHalf then
   cct2lt['THCudaHalfTensor'] = 'torch.CudaHalfTensor'
   local half_replacement = {
     ['THCTensor'] = 'THCudaHalfTensor',
-    ['THIndexTensor'] = 'THCudaLongTensor',
+    ['THCIndexTensor'] = 'THCudaLongTensor',
     ['TYPE'] = 'CudaHalf',
     ['real'] = 'half'
   }
