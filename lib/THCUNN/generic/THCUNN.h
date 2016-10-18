@@ -310,6 +310,45 @@ TH_API void THNN_(SpatialFractionalMaxPooling_updateGradInput)(
                   int poolSizeW, int poolSizeH,
                   THCIndexTensor *indices);
 
+TH_API void THNN_(SpatialFullConvolution_updateOutput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *output,
+                  THCTensor *weight,
+                  THCTensor *bias,          // [OPTIONAL]
+                  THCTensor *columns,
+                  THCTensor *ones,
+                  int kW, int kH,
+                  int dW, int dH,
+                  int padW, int padH,
+                  int adjW, int adjH);
+
+TH_API void THNN_(SpatialFullConvolution_updateGradInput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *gradOutput,
+                  THCTensor *gradInput,
+                  THCTensor *weight,
+                  THCTensor *gradColumns,
+                  int kW, int kH,
+                  int dW, int dH,
+                  int padW, int padH,
+                  int adjW, int adjH);
+
+TH_API void THNN_(SpatialFullConvolution_accGradParameters)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *gradOutput,
+                  THCTensor *gradWeight,
+                  THCTensor *gradBias,     // [OPTIONAL]
+                  THCTensor *columns,
+                  THCTensor *ones,
+                  int kW, int kH,
+                  int dW, int dH,
+                  int padW, int padH,
+                  int adjW, int adjH,
+                  real scale);
+
 TH_API void THNN_(SpatialMaxPooling_updateOutput)(
                   THCState *state,
                   THCTensor *input,
