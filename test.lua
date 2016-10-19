@@ -1965,7 +1965,7 @@ function cunntest.SpatialSubSampling_backward_batch()
       -- precision issues with half
       precision_backward_old = precision_backward
       if typename == 'torch.CudaHalfTensor' then
-        precision_backward = 0.4
+        precision_backward = 0.7
       end
       local input = torch.randn(bs,from,inj,ini):type(typename)
       local gradOutput = torch.randn(bs,to,outj,outi):type(typename)

@@ -380,10 +380,9 @@ void THNN_(SpatialConvolutionMM_accGradParameters)(
 
     // Do GEMV (note: this is a bit confusing because gemv assumes column-major matrices)
     if (gradBias) {
+      #if defined(THC_REAL_IS_FLOAT) || defined(THC_REAL_IS_DOUBLE)
       #ifdef THC_REAL_IS_FLOAT
       THCudaBlas_Sgemv(
-      #elif defined(THC_REAL_IS_HALF)
-      THCudaBlas_Hgemv(
       #elif defined(THC_REAL_IS_DOUBLE)
       THCudaBlas_Dgemv(
       #endif
@@ -396,6 +395,19 @@ void THNN_(SpatialConvolutionMM_accGradParameters)(
           ScalarConvert<int, real>::to(1),
           THCTensor_(data)(state, gradBias), 1
       );
+      #endif
+      #ifdef THC_REAL_IS_HALF
+      THCudaBlas_Hgemm(
+          state,
+          't', 'n',
+          m_, 1, k_,
+          scale,
+          THCTensor_(data)(state, gradOutput_n), k_,
+          THCTensor_(data)(state, ones), k_,
+          ScalarConvert<int, real>::to(1),
+          THCTensor_(data)(state, gradBias), m_
+      );
+      #endif
     }
   }
 
