@@ -1,4 +1,5 @@
 local cunntest = torch.TestSuite()
+local ffi = require 'ffi'
 local precision_forward = 1e-4
 local precision_backward = 1e-2
 local nloop = 1
@@ -3394,6 +3395,9 @@ function cunntest.mse()
          local cout = cmod:forward(cinput,ctarget)
          local cgin = cmod:backward(cinput,ctarget)
 
+         if (typename == 'torch.CudaHalfTensor') then
+            fout = ffi.C.THC_half2float(ffi.C.THC_float2half(fout))
+         end
          mytester:assertlt(math.abs(fout-cout), precision_forward_type(0.02, typename),
             string.format('error  on output with %s', typename))
          local gerr = cgin:double() - fgin:double()
