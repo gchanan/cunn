@@ -106,7 +106,7 @@ TH_API void THNN_(MarginCriterion_updateOutput)(
                   THCTensor *target,
                   THCTensor *output,
                   bool sizeAverage,
-                  accreal margin);
+                  real margin);
 
 TH_API void THNN_(MarginCriterion_updateGradInput)(
                   THCState *state,
@@ -114,7 +114,7 @@ TH_API void THNN_(MarginCriterion_updateGradInput)(
                   THCTensor *target,
                   THCTensor *gradInput,
                   bool sizeAverage,
-                  accreal margin);
+                  real margin);
 
 TH_API void THNN_(PReLU_updateOutput)(
                   THCState *state,

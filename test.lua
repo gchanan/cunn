@@ -3146,18 +3146,25 @@ end
 
 function cunntest.MarginCriterion_forward()
   local size = math.random(1,100)
-  local input = (torch.rand(size)-0.5) * 2 -- data spread from -1 to 1
-  local target = (torch.round(torch.rand(size))*2)-1 -- generate random labels -1, 1
 
-  local crit = nn.MarginCriterion()
-  local groundtruth= crit:forward(input, target)
+  for k, typename in ipairs(typenames) do
+    local input = ((torch.rand(size)-0.5) * 2):type(typename) -- data spread from -1 to 1
+    local target = ((torch.round(torch.rand(size))*2)-1):type(typename) -- generate random labels -1, 1
 
-  input = input:cuda()
-  target = target:cuda()
-  local g_crit = nn.MarginCriterion():cuda()
-  local rescuda = g_crit:forward(input, target)
-  local errorVal = rescuda - groundtruth
-  mytester:assertlt(errorVal, precision_forward, 'error on state (forward) ')
+    local ctype = t2cpu[typename]
+    input = input:type(ctype)
+    target = input:type(ctype)
+    local crit = nn.MarginCriterion():type(ctype)
+    local groundtruth= crit:forward(input, target)
+
+    input = input:type(typename)
+    target = target:type(typename)
+    local g_crit = nn.MarginCriterion():type(typename)
+    local rescuda = g_crit:forward(input, target)
+    local errorVal = rescuda - groundtruth
+    mytester:assertlt(errorVal, precision_forward_type(precision_forward, typename),
+        string.format('error on state (forward) with %s', typename))
+  end
 end
 
 function cunntest.MultiLabelMarginCriterion_forward()
