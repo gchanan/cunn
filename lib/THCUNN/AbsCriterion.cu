@@ -9,13 +9,13 @@
 #include <thrust/reduce.h>
 #include <thrust/inner_product.h>
 
-template <typename Dtype>
+template <typename Dtype, typename Acctype>
 struct abs_functor
 {
-  __host__ __device__ Dtype operator()(const Dtype& x, const Dtype& y) const
+  __host__ __device__ Acctype operator()(const Dtype& x, const Dtype& y) const
   {
     Dtype z = x-y;
-    return z >= 0 ? z : -z;
+    return ScalarConvert<Dtype, Acctype>::to(z >= 0 ? z : -z);
   }
 };
 

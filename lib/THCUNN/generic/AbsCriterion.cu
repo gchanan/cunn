@@ -18,7 +18,7 @@ void THNN_(AbsCriterion_updateOutput)(
 
   thrust::device_ptr<real> input_data(THCTensor_(data)(state, input));
   thrust::device_ptr<real> target_data(THCTensor_(data)(state, target));
-  real sum = thrust::inner_product(input_data, input_data+size, target_data, ScalarConvert<int, real>::to(0), thrust::plus<real>(), abs_functor<real>());
+  accreal sum = thrust::inner_product(input_data, input_data+size, target_data, (accreal)0, thrust::plus<accreal>(), abs_functor<real, accreal>());
 
   if (sizeAverage)
     sum /= size;
@@ -26,7 +26,7 @@ void THNN_(AbsCriterion_updateOutput)(
   THCTensor_(free)(state, input);
   THCTensor_(free)(state, target);
 
-  THCTensor_(set1d)(state, output, 0, sum);
+  THCTensor_(set1d)(state, output, 0, ScalarConvert<accreal, real>::to(sum));
 }
 
 void THNN_(AbsCriterion_updateGradInput)(
