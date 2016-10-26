@@ -2,17 +2,6 @@
 #define THC_GENERIC_FILE "generic/SparseLinear.cu"
 #else
 
-/*static cusparseHandle_t cusparse_handle = 0;
-
-static void init_cusparse() {
-  if (cusparse_handle == 0) {
-    cusparseStatus_t status = cusparseCreate(&cusparse_handle);
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-      THError("CUSPARSE Library initialization failed");
-    }
-  }
-}*/
-
 static bool checkInput(THCTensor* t)
 {
   return t->nDimension == 2 && t->size[1] == 3;
@@ -45,7 +34,7 @@ void THNN_(SparseLinear_updateOutput)(
            THCTensor *weight,
            THCTensor *bias)
 {
-  THAssert(THCudaTensor_checkGPU(state, 4, input, output, weight, bias));
+  THAssert(THCTensor_(checkGPU)(state, 4, input, output, weight, bias));
 
   long h;
   long outDim = THCTensor_(size)(state, weight, 0);
@@ -95,12 +84,16 @@ void THNN_(SparseLinear_updateOutput)(
   }
 
   // output = W * x
-  float one = 1;
+  real one = ScalarConvert<int, real>::to(1);
   cusparseMatDescr_t descr = 0;
   cusparseCreateMatDescr(&descr);
   cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
   cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
+  #ifdef THC_REAL_IS_FLOAT
   cusparseScsrmm(cusparse_handle,
+  #elif defined(THC_REAL_IS_DOUBLE)
+  cusparseDcsrmm(cusparse_handle,
+  #endif
       CUSPARSE_OPERATION_NON_TRANSPOSE,
       batchnum, outDim, inDim, nnz,
       &one,
@@ -189,12 +182,16 @@ void THNN_(SparseLinear_accGradParameters)(
   THCTensor_(copy)(state, buf, gradOutput);
   THCTensor_(transpose)(state, gradOutput, NULL, 0, 1); // Restore gradOutput
 
-  float one = 1;
+  real one = ScalarConvert<int, real>::to(1);
   cusparseMatDescr_t descr = 0;
   cusparseCreateMatDescr(&descr);
   cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
   cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
+  #ifdef THC_REAL_IS_FLOAT
   cusparseScsrmm(cusparse_handle,
+  #elif defined(THC_REAL_IS_DOUBLE)
+  cusparseDcsrmm(cusparse_handle,
+  #endif
       CUSPARSE_OPERATION_NON_TRANSPOSE,
       inDim, outDim, batchnum, nnz,
       &one,
@@ -236,12 +233,12 @@ void THNN_(SparseLinear_legacyUpdateOutput)(
 }
 void THNN_(SparseLinear_legacyAccGradParameters)(
            THCState *state,
-           THCudaTensor *input,
-           THCudaTensor *gradOutput,
-           THCudaTensor *gradWeight,
-           THCudaTensor *gradBias,
-           THCudaTensor *weight,
-           THCudaTensor *bias,
+           THCTensor *input,
+           THCTensor *gradOutput,
+           THCTensor *gradWeight,
+           THCTensor *gradBias,
+           THCTensor *weight,
+           THCTensor *bias,
            double weightDecay,
            double scale) {
   THError("CUDA does not support legacy input format, please use a table of nnz x 2 vectors");

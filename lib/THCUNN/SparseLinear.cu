@@ -15,23 +15,71 @@ static void init_cusparse() {
     }
   }
 }
-/*
-static bool checkInput(THCudaTensor* t)
-{
-  return t->nDimension == 2 && t->size[1] == 3;
+
+void THNN_CudaHalfSparseLinear_updateOutput(
+          THCState *state,
+          THCudaHalfTensor *input,
+          THCudaHalfTensor *output,
+          THCudaHalfTensor *weight,
+          THCudaHalfTensor *bias) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
 }
 
-static bool checkSize2D(THCudaTensor* t, long size0, long size1)
-{
-  return t->nDimension == 2 && t->size[0] == size0 && t->size[1] == size1;
+void THNN_CudaHalfSparseLinear_accGradParameters(
+          THCState *state,
+          THCudaHalfTensor *input,
+          THCudaHalfTensor *gradOutput,
+          THCudaHalfTensor *gradWeight,
+          THCudaHalfTensor *gradBias,
+          THCudaHalfTensor *weight,
+          THCudaHalfTensor *bias,
+          double weightDecay,
+          double scale) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
 }
 
-static bool checkSize1D(THCudaTensor* t, long size0)
-{
-  return t->nDimension == 1 && t->size[0] == size0;
-}*/
+void THNN_CudaHalfSparseLinear_legacyUpdateOutput(
+          THCState *state,
+          THCudaHalfTensor *input,
+          THCudaHalfTensor *output,
+          THCudaHalfTensor *weight,
+          THCudaHalfTensor *bias) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
+}
 
+void THNN_CudaHalfSparseLinear_legacyAccGradParameters(
+          THCState *state,
+          THCudaHalfTensor *input,
+          THCudaHalfTensor *gradOutput,
+          THCudaHalfTensor *gradWeight,
+          THCudaHalfTensor *gradBias,
+          THCudaHalfTensor *weight,
+          THCudaHalfTensor *bias,
+          double weightDecay,
+          double scale) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
+}
 
+void THNN_CudaHalfSparseLinear_zeroGradParameters(
+          THCState *state,
+          THCudaHalfTensor *gradWeight,
+          THCudaHalfTensor *gradBias,
+          THCudaHalfTensor *lastInput) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
+}
+
+void THNN_CudaHalfSparseLinear_updateParameters(
+          THCState *state,
+          THCudaHalfTensor *weight,
+          THCudaHalfTensor *bias,
+          THCudaHalfTensor *gradWeight,
+          THCudaHalfTensor *gradBias,
+          THCudaHalfTensor *lastInput,
+          double learningRate) {
+  THError("THCudaHalfTensor not supported with SparseLinear");
+}
 
 #include "generic/SparseLinear.cu"
-#include "THCGenerateFloatTypes.h"
+#include "THCGenerateFloatType.h"
+#include "generic/SparseLinear.cu"
+#include "THCGenerateDoubleType.h"
