@@ -736,7 +736,7 @@ function cunntest.SparseLinear_forward()
             for i=1,inb do
                 local nnz = math.random(5, 10)
                 local inds = torch.randperm(ini)[{{1,nnz}}]
-                input[i] = torch.Tensor(nnz, 2)
+                input[i] = torch.Tensor(nnz, 2):type(ctype)
                 input[i]:select(2,1):copy(inds)
                 input[i]:select(2,2):copy(torch.rand(nnz):type(typename):type(ctype))
             end
@@ -770,11 +770,11 @@ function cunntest.SparseLinear_backward()
 
             -- Create a random sparse vector
             local input = {}
-            local nonsparse = torch.zeros(inb, ini)
+            local nonsparse = torch.zeros(inb, ini):type(ctype)
             for i=1,inb do
                 local nnz = math.random(3, 5)
                 local inds = torch.randperm(ini)[{{1,nnz}}]
-                input[i] = torch.Tensor(nnz, 2)
+                input[i] = torch.Tensor(nnz, 2):type(ctype)
                 input[i]:select(2,1):copy(inds)
                 input[i]:select(2,2):copy(torch.rand(nnz):type(typename):type(ctype))
                 nonsparse[i]:scatter(1, input[i]:select(2,1):long(), input[i]:select(2,2))
