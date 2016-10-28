@@ -4083,14 +4083,14 @@ function cunntest.ClassNLLCriterionMultipleTarget()
       local fgin = mod:backward(input, target):clone()
 
       local cinput = input:type(typename)
-      local ctarget = target:type(typename)
+      local ctarget = target:cuda()
 
       local cmod = nn.ClassNLLCriterion():type(typename)
       local cout = cmod:forward(cinput,ctarget)
       local cgin = cmod:backward(cinput,ctarget)
 
       mytester:assertlt(
-        math.abs(fout-cout), 3*precision_forward_type(precision_forward, typename),
+        math.abs(fout-cout), precision_forward_type(precision_forward, typename),
           string.format('error on output with %s', typename))
 
       local gerr = cgin:double() - fgin:double()
@@ -4150,7 +4150,7 @@ function cunntest.ClassNLLCriterionMultipleTargetWeights()
       local fgin = mod:backward(input, target):clone()
 
       local cinput = input:type(typename)
-      local ctarget = target:type(typename)
+      local ctarget = target:cuda()
       local cweights = weights:type(typename)
 
       local cmod = nn.ClassNLLCriterion(cweights):type(typename)
@@ -4158,7 +4158,7 @@ function cunntest.ClassNLLCriterionMultipleTargetWeights()
       local cgin = cmod:backward(cinput,ctarget)
 
       mytester:assertlt(
-        math.abs(fout-cout), 3*precision_forward_type(precision_forward, typename),
+        math.abs(fout-cout), precision_forward_type(precision_forward, typename),
           string.format('error on output with %s', typename))
 
       local gerr = cgin:double() - fgin:double()
