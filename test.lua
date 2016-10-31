@@ -4588,22 +4588,27 @@ function cunntest.VolumetricMaxUnpooling_forward_batch()
    local ii = ((outi + padi*2 - ki)/si) +1
    local ij = ((outj + padj*2 - kj)/sj) +1
 
-   local pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj)
-   local sunpool = nn.VolumetricMaxUnpooling(pooler)
+   for k, typename in ipairs(typenames) do
+      local ctype = t2cpu[typename]
 
-   local original = torch.randn(bs,from,it,ij,ii)
-   local input = pooler:forward(original)
-   local groundtruth = sunpool:forward(input)
+      local pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):type(ctype)
+      local sunpool = nn.VolumetricMaxUnpooling(pooler):type(ctype)
 
-   original = original:cuda()
-   pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):cuda()
-   local gunpool = nn.VolumetricMaxUnpooling(pooler):cuda()
+      local original = torch.randn(bs,from,it,ij,ii):type(typename):type(ctype)
+      local input = pooler:forward(original)
+      local groundtruth = sunpool:forward(input)
 
-   input = pooler:forward(original)
-   local rescuda = gunpool:forward(input)
+      original = original:type(typename)
+      pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):type(typename)
+      local gunpool = nn.VolumetricMaxUnpooling(pooler):type(typename)
 
-   local error = rescuda:float() - groundtruth
-   mytester:assertlt(error:abs():max(), precision_forward, 'error on state (forward) ')
+      input = pooler:forward(original)
+      local rescuda = gunpool:forward(input)
+
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+        string.format('error on state (forward) with %s', typename))
+   end
 end
 
 function cunntest.VolumetricMaxUnpooling_backward_batch()
@@ -4624,30 +4629,35 @@ function cunntest.VolumetricMaxUnpooling_backward_batch()
    local ii = ((outi + padi*2 - ki)/si) +1
    local ij = ((outj + padj*2 - kj)/sj) +1
 
-   local pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj)
-   local sunpool = nn.VolumetricMaxUnpooling(pooler)
+   for k, typename in ipairs(typenames) do
+      local ctype = t2cpu[typename]
 
-   local original = torch.randn(bs,from,it,ij,ii)
-   local input = pooler:forward(original)
-   local gradOutput = torch.randn(original:size())
-   sunpool:forward(input)
-   sunpool:zeroGradParameters()
-   local groundgrad = sunpool:backward(input, gradOutput)
+      local pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):type(ctype)
+      local sunpool = nn.VolumetricMaxUnpooling(pooler):type(ctype)
 
-   pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):cuda()
-   local gunpool = nn.VolumetricMaxUnpooling(pooler):cuda()
+      local original = torch.randn(bs,from,it,ij,ii):type(typename):type(ctype)
+      local input = pooler:forward(original)
+      local gradOutput = torch.randn(original:size()):type(typename):type(ctype)
+      sunpool:forward(input)
+      sunpool:zeroGradParameters()
+      local groundgrad = sunpool:backward(input, gradOutput)
 
-   original = original:cuda()
-   input = pooler:forward(original)
-   gunpool:forward(input)
+      pooler = nn.VolumetricMaxPooling(kt,ki,kj,st,si,sj,padt,padi,padj):type(typename)
+      local gunpool = nn.VolumetricMaxUnpooling(pooler):type(typename)
 
-   gradOutput = gradOutput:cuda()
-   gunpool:zeroGradParameters()
-   local rescuda = gunpool:backward(input, gradOutput)
+      original = original:type(typename)
+      input = pooler:forward(original)
+      gunpool:forward(input)
 
-   local error = rescuda:float() - groundgrad
+      gradOutput = gradOutput:type(typename)
+      gunpool:zeroGradParameters()
+      local rescuda = gunpool:backward(input, gradOutput)
 
-   mytester:assertlt(error:abs():max(), precision_backward, 'error on state (backward) ')
+      local error = rescuda:double() - groundgrad:double()
+
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+        string.format('error on state (backward) with %s', typename))
+   end
 end
 
 function cunntest.VolumetricAveragePooling_forward()
