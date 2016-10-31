@@ -914,4 +914,23 @@ TH_API void THNN_(Threshold_updateGradInput)(
                   real val,
                   bool inplace);
 
+TH_API void THNN_(VolumetricMaxUnpooling_updateOutput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *output,
+                  THCIndexTensor *indices,
+                  int outputTime, int outputWidth, int outputHeight,
+                  int dT, int dW, int dH,
+                  int padT, int padW, int padH);
+
+TH_API void THNN_(VolumetricMaxUnpooling_updateGradInput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *gradOutput,
+                  THCTensor *gradInput,
+                  THCIndexTensor *indices,
+                  int outputTime, int outputWidth, int outputHeight,
+                  int dT, int dW, int dH,
+                  int padT, int padW, int padH);
+
 #endif
