@@ -1,10 +1,3 @@
-/*#include "THCUNN.h"
-#include "common.h"
-#include "THCDeviceTensor.cuh"
-#include "THCDeviceTensorUtils.cuh"
-#include "THCDeviceUtils.cuh"
-
-#include <cfloat>*/
 #ifndef THC_GENERIC_FILE
 #define THC_GENERIC_FILE "generic/VolumetricMaxPooling.cu"
 #else
