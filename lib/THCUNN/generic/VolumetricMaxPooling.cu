@@ -2,13 +2,11 @@
 #define THC_GENERIC_FILE "generic/VolumetricMaxPooling.cu"
 #else
 
-#include "../common.h"
-
 void THNN_(VolumetricMaxPooling_updateOutput)(
            THCState *state,
            THCTensor *input,
            THCTensor *output,
-           THCTensor *indices,
+           THCIndexTensor *indices,
            int kT, int kW, int kH,
            int dT, int dW, int dH,
            int padT, int padW, int padH,
@@ -25,7 +23,7 @@ void THNN_(VolumetricMaxPooling_updateGradInput)(
            THCTensor *input,
            THCTensor *gradOutput,
            THCTensor *gradInput,
-           THCTensor *indices,
+           THCIndexTensor *indices,
            int dT, int dW, int dH,
            int padT, int padW, int padH)
 {
