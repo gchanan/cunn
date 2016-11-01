@@ -26,44 +26,5 @@ TH_API void THNN_CudaLookupTable_renorm(
           float maxNorm,
           float normType);
 
-TH_API void THNN_CudaVolumetricDilatedConvolution_updateOutput(
-          THCState *state,
-          THCudaTensor *input,
-          THCudaTensor *output,
-          THCudaTensor *weight,
-          THCudaTensor *bias,
-          THCudaTensor *columns,
-          THCudaTensor *ones,
-          int kT, int kW, int kH,
-          int dT, int dW, int dH,
-          int padT, int padW, int padH,
-          int dilationT, int dilationW, int dilationH);
-
-TH_API void THNN_CudaVolumetricDilatedConvolution_updateGradInput(
-          THCState *state,
-          THCudaTensor *input,
-          THCudaTensor *gradOutput,
-          THCudaTensor *gradInput,
-          THCudaTensor *weight,
-          THCudaTensor *gradColumns,
-          int kT, int kW, int kH,
-          int dT, int dW, int dH,
-          int padT, int padW, int padH,
-          int dilationT, int dilationW, int dilationH);
-
-TH_API void THNN_CudaVolumetricDilatedConvolution_accGradParameters(
-          THCState *state,
-          THCudaTensor *input,
-          THCudaTensor *gradOutput,
-          THCudaTensor *gradWeight,
-          THCudaTensor *gradBias,
-          THCudaTensor *columns,
-          THCudaTensor *ones,
-          int kT, int kW, int kH,
-          int dT, int dW, int dH,
-          int padT, int padW, int padH,
-          int dilationT, int dilationW, int dilationH,
-          float scale);
-
 #include "generic/THCUNN.h"
 #include "THCGenerateFloatTypes.h"

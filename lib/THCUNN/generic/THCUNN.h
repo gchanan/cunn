@@ -997,6 +997,45 @@ TH_API void THNN_(VolumetricConvolution_accGradParameters)(
                   int padT, int padW, int padH,
                   real scale);
 
+TH_API void THNN_(VolumetricDilatedConvolution_updateOutput)(
+                  THCState *state,
+                  THCTensor  *input,
+                  THCTensor  *output,
+                  THCTensor  *weight,
+                  THCTensor  *bias,
+                  THCTensor  *columns,
+                  THCTensor  *ones,
+                  int kT, int kW, int kH,
+                  int dT, int dW, int dH,
+                  int padT, int padW, int padH,
+                  int dilationT, int dilationW, int dilationH);
+
+TH_API void THNN_(VolumetricDilatedConvolution_updateGradInput)(
+                  THCState *state,
+                  THCTensor  *input,
+                  THCTensor  *gradOutput,
+                  THCTensor  *gradInput,
+                  THCTensor  *weight,
+                  THCTensor  *gradColumns,
+                  int kT, int kW, int kH,
+                  int dT, int dW, int dH,
+                  int padT, int padW, int padH,
+                  int dilationT, int dilationW, int dilationH);
+
+TH_API void THNN_(VolumetricDilatedConvolution_accGradParameters)(
+                  THCState *state,
+                  THCTensor  *input,
+                  THCTensor  *gradOutput,
+                  THCTensor  *gradWeight,
+                  THCTensor  *gradBias,
+                  THCTensor  *columns,
+                  THCTensor  *ones,
+                  int kT, int kW, int kH,
+                  int dT, int dW, int dH,
+                  int padT, int padW, int padH,
+                  int dilationT, int dilationW, int dilationH,
+                  real scale);
+
 TH_API void THNN_(VolumetricDilatedMaxPooling_updateOutput)(
                   THCState *state,
                   THCTensor *input,
