@@ -2,6 +2,7 @@
 #define THCUNN_VOL2COL_H
 
 #include "common.h"
+#include "THCNumerics.cuh"
 
 // Kernel for fast unfold+copy on volumes
 template <typename Dtype>
@@ -33,7 +34,7 @@ CUDA_KERNEL_LOOP(index, n) {
           int h = h_in + j * dilation_h;
           int w = w_in + k * dilation_w;
           *data_col = (t >= 0 && h >= 0 && w >= 0 && t < depth && h < height && w < width) ?
-            data_vol[i * dilation_t * height * width + j * dilation_h * width + k * dilation_w] : 0;
+            data_vol[i * dilation_t * height * width + j * dilation_h * width + k * dilation_w] : ScalarConvert<int, Dtype>::to(0);
           data_col += depth_col * height_col * width_col;
         }
       }
@@ -75,7 +76,7 @@ __global__ void vol2im_kernel(const int n, const Dtype* data_col,
     const int depth_col, const int height_col, const int width_col,
     Dtype* data_vol) {
   CUDA_KERNEL_LOOP(index, n) {
-    Dtype val = 0;
+    Dtype val = ScalarConvert<int, Dtype>::to(0);
     const int w_im = index % width + pad_w;
     const int h_im = (index / width) % height + pad_h;
     const int t_im = (index / width / height) % depth + pad_t;
