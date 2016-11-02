@@ -236,7 +236,7 @@ void THNN_(VolumetricDilatedConvolution_updateGradInput)(
     );
 
     // Unpack columns back into input:
-    col2vol(
+    col2vol<real, accreal>(
       THCState_getCurrentStream(state),
       THCTensor_(data)(state, gradColumns),
       nInputPlane, inputDepth, inputHeight, inputWidth,

@@ -98,7 +98,7 @@ void THNN_(VolumetricFullConvolution_updateOutput)(
     );
 
     // Unpack columns back into input:
-    col2vol(
+    col2vol<real, accreal>(
       THCState_getCurrentStream(state),
       THCTensor_(data)(state, columns),
       nOutputPlane, outputDepth, outputHeight, outputWidth, kT, kH, kW, padT, padH, padW, dT, dH, dW,

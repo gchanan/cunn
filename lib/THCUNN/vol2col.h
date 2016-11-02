@@ -66,7 +66,7 @@ void vol2col(cudaStream_t stream, const Dtype* data_vol, const int channels,
   THCudaCheck(cudaGetLastError());
 }
 
-template <typename Dtype>
+template <typename Dtype, typename Acctype>
 __global__ void vol2im_kernel(const int n, const Dtype* data_col,
     const int depth, const int height, const int width, const int channels,
     const int kernel_t, const int kernel_h, const int kernel_w,
@@ -76,7 +76,7 @@ __global__ void vol2im_kernel(const int n, const Dtype* data_col,
     const int depth_col, const int height_col, const int width_col,
     Dtype* data_vol) {
   CUDA_KERNEL_LOOP(index, n) {
-    Dtype val = ScalarConvert<int, Dtype>::to(0);
+    Acctype val = Acctype(0);
     const int w_im = index % width + pad_w;
     const int h_im = (index / width) % height + pad_h;
     const int t_im = (index / width / height) % depth + pad_t;
@@ -113,11 +113,11 @@ __global__ void vol2im_kernel(const int n, const Dtype* data_col,
         }
       }
     }
-    data_vol[index] = val;
+    data_vol[index] = ScalarConvert<Acctype, Dtype>::to(val);
   }
 }
 
-template <typename Dtype>
+template <typename Dtype, typename Acctype>
 void col2vol(cudaStream_t stream, const Dtype* data_col, const int channels,
     const int depth, const int height, const int width,
     const int patch_t, const int patch_h, const int patch_w,
@@ -131,7 +131,7 @@ void col2vol(cudaStream_t stream, const Dtype* data_col, const int channels,
   int num_kernels = channels * depth * height * width;
   // To avoid involving atomic operations, we will launch one kernel per
   // bottom dimension, and then in the kernel add up the top dimensions.
-  vol2im_kernel <<<GET_BLOCKS(num_kernels), CUDA_NUM_THREADS, 0, stream>>> (
+  vol2im_kernel<Dtype, Acctype> <<<GET_BLOCKS(num_kernels), CUDA_NUM_THREADS, 0, stream>>> (
       num_kernels, data_col, depth, height, width, channels,
       patch_t, patch_h, patch_w, pad_t, pad_h, pad_w, stride_t, stride_h, stride_w,
       dilation_t, dilation_h, dilation_w,
