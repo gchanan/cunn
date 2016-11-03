@@ -68,7 +68,7 @@ __global__ void SpatialFractionalMaxPooling_updateOutput(
       }
     }
 
-    assert(maxVal != -THCNumerics<Dtype>::min());
+    assert(maxVal != THCNumerics<Dtype>::min());
     assert(maxIndex != -1);
 
     // +1 for Lua index
