@@ -10,7 +10,7 @@
 #include <cfloat>
 
 template <typename Dtype, typename Acctype>
-__device__ inline int getInterval(Dtype sample,
+__device__ inline int getInterval(Acctype sample,
                                   int index,
                                   int inputSize,
                                   int outputSize,
@@ -19,7 +19,7 @@ __device__ inline int getInterval(Dtype sample,
   if (index == outputSize - 1) {
     return inputSize - poolSize;
   } else {
-    return (int) ((index + ScalarConvert<Dtype, Acctype>::to(sample)) * alpha) - (int) (sample * alpha);
+    return (int) ((index + sample) * alpha) - (int) (sample * alpha);
   }
 }
 
@@ -42,9 +42,9 @@ __global__ void SpatialFractionalMaxPooling_updateOutput(
     int outputW = ourOutputPoint % output.getSize(3);
     int outputH = ourOutputPoint / output.getSize(3);
 
-    int poolW = getInterval<Dtype, Acctype>(samples[batch][plane][0], outputW,
+    int poolW = getInterval<Dtype, Acctype>(ScalarConvert<Dtype, Acctype>::to(samples[batch][plane][0]), outputW,
                             input.getSize(3), output.getSize(3), poolSizeW);
-    int poolH = getInterval<Dtype, Acctype>(samples[batch][plane][1], outputH,
+    int poolH = getInterval<Dtype, Acctype>(ScalarConvert<Dtype, Acctype>::to(samples[batch][plane][1]), outputH,
                             input.getSize(2), output.getSize(2), poolSizeH);
 
     Dtype maxVal = THCNumerics<Dtype>::min();
@@ -54,16 +54,22 @@ __global__ void SpatialFractionalMaxPooling_updateOutput(
       if (PoolSizeWStatic == -1) {
         for (int w = poolW; w < poolW + poolSizeW; ++w) {
           Dtype val = input[batch][plane][h][w];
-          maxVal = fmaxType(val, maxVal);
-          maxIndex = THCNumerics<Dtype>::eq(maxVal, val) ? (h * input.getSize(3) + w) : maxIndex;
+          // for consistency with THNN, favor the first max
+          if (val > maxVal) {
+            maxIndex = h * input.getSize(3) + w;
+            maxVal = val;
+          }
         }
       } else {
 #pragma unroll
         for (int i = 0; i < PoolSizeWStatic; ++i) {
           int w = i + poolW;
           Dtype val = input[batch][plane][h][w];
-          maxVal = fmaxType(val, maxVal);
-          maxIndex = THCNumerics<Dtype>::eq(maxVal, val) ? (h * input.getSize(3) + w) : maxIndex;
+          // for consistency with THNN, favor the first max
+          if (val > maxVal) {
+            maxIndex = h * input.getSize(3) + w;
+            maxVal = val;
+          }
         }
       }
     }

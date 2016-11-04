@@ -8,8 +8,8 @@ local times = {}
 --e.g.: th -lcunn -e "nn.testcuda{'Sigmoid_forward'}"
 
 local typenames = {
-  --'torch.CudaTensor',
-  --'torch.CudaDoubleTensor',
+  'torch.CudaTensor',
+  'torch.CudaDoubleTensor',
 }
 
 local t2cpu = {
@@ -34,18 +34,22 @@ function torch.CudaDoubleTensor:mean()
    return self:cuda():mean()
 end
 
+local function half_max_error(maxabs)
+  return maxabs and (10^(math.floor(math.log(maxabs) / math.log(2)))) * (2^(-10)) or 0
+end
+
 -- half has additional error on top of double/float
-local function precision_forward_type(precision_f, tensor_type)
+local function precision_forward_type(precision_f, tensor_type, maxabs)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 1e-2 + precision_f
+      return 1e-2 + precision_f + half_max_error(maxabs)
    else
       return precision_f
    end
 end
 
-local function precision_backward_type(precision_b, tensor_type)
+local function precision_backward_type(precision_b, tensor_type, maxabs)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 1e-1 + precision_b
+      return 1e-1 + precision_b + half_max_error(maxabs)
    else
       return precision_b
    end
@@ -836,13 +840,13 @@ local function BatchNormalization_forward(moduleName, inputSize)
       local rescuda = gbnorm:forward(input)
 
       local error = rescuda:double() - groundtruth:double()
-      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename, rescuda:abs():max()),
          string.format('error on state (forward) with %s', typename))
       mytester:assertlt((gbnorm.running_mean:double() - sbnorm.running_mean:double()):abs():max(),
-         precision_forward_type(precision_forward, typename),
+         precision_forward_type(precision_forward, typename, gbnorm.running_mean:abs():max()),
          string.format('error on running_mean (forward) with %s', typenanme))
       mytester:assertlt((gbnorm.running_var:double() - sbnorm.running_var:double()):abs():max(),
-         precision_forward_type(precision_forward, typename),
+         precision_forward_type(precision_forward, typename, gbnorm.running_var:abs():max()),
          string.format('error on running_var (forward) with %s', typename))
    end
 end
@@ -858,6 +862,9 @@ local function BatchNormalization_forward_inference(moduleName, inputSize)
       local sbnorm = nn[moduleName](planes):type(ctype)
       sbnorm.running_mean:normal(1, 2)
       sbnorm.running_var:uniform(1e-3, 2)
+      sbnorm.running_var = sbnorm.running_var:type(typename):type(ctype)
+      sbnorm.running_mean = sbnorm.running_mean:type(typename):type(ctype)
+
       sbnorm:evaluate()
       local groundtruth = sbnorm:forward(input)
 
@@ -871,7 +878,7 @@ local function BatchNormalization_forward_inference(moduleName, inputSize)
       local rescuda = gbnorm:forward(input)
 
       local error = rescuda:double() - groundtruth:double()
-      mytester:assertlt(error:abs():max(), 3*precision_forward_type(precision_forward, typename),
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename, rescuda:abs():max()),
          string.format('error on state (forward evaluate) with %s', typename))
    end
 end
@@ -920,11 +927,11 @@ local function BatchNormalization_backward(moduleName, mode, inputSize, backward
       local werror = weightcuda:double() - groundweight:double()
       local berror = biascuda:double() - groundbias:double()
 
-      mytester:assertlt(error:abs():max(), 3*precision_backward_type(precision_backward, typename),
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename, rescuda:abs():max()),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), 5*precision_backward_type(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(), precision_backward_type(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), 5*precision_backward_type(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(), precision_backward_type(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
     end
 end
@@ -4511,9 +4518,9 @@ function cunntest.VolumetricMaxUnpooling_forward_batch()
    local padt = math.random(0,kt/2-1)
    local padi = math.random(0,ki/2-1)
    local padj = math.random(0,kj/2-1)
-   local it = ((outt + padt*2 - kt)/st) +1
-   local ii = ((outi + padi*2 - ki)/si) +1
-   local ij = ((outj + padj*2 - kj)/sj) +1
+   local it = math.max(((outt + padt*2 - kt)/st) +1, kt)
+   local ii = math.max(((outi + padi*2 - ki)/si) +1, ki)
+   local ij = math.max(((outj + padj*2 - kj)/sj) +1, kj)
 
    for k, typename in ipairs(typenames) do
       local ctype = t2cpu[typename]
@@ -4552,9 +4559,9 @@ function cunntest.VolumetricMaxUnpooling_backward_batch()
    local padt = math.random(0,kt/2-1)
    local padi = math.random(0,ki/2-1)
    local padj = math.random(0,kj/2-1)
-   local it = ((outt + padt*2 - kt)/st) +1
-   local ii = ((outi + padi*2 - ki)/si) +1
-   local ij = ((outj + padj*2 - kj)/sj) +1
+   local it = math.max(((outt + padt*2 - kt)/st) +1, kt)
+   local ii = math.max(((outi + padi*2 - ki)/si) +1, ki)
+   local ij = math.max(((outj + padj*2 - kj)/sj) +1, kj)
 
    for k, typename in ipairs(typenames) do
       local ctype = t2cpu[typename]
@@ -5099,7 +5106,7 @@ function cunntest.LookupTable_backward()
           gconv:backward(input, gradOutput)
 
           local weightGradError = gconv.gradWeight:double() - sconv.gradWeight:double()
-          mytester:assertlt(weightGradError:abs():max(), precision_backward_type(precision_backward, typename),
+          mytester:assertlt(weightGradError:abs():max(), precision_backward_type(precision_backward, typename, gconv.gradWeight:abs():max()),
               'error on weight for size ' .. tostring(s.nInput) ..
               ' nVocab: ' .. tostring(s.nVocab) ..
               ' nDim ' .. tostring(s.nDim) ..
@@ -5605,7 +5612,7 @@ function nn.testcuda(tests, print_timing, n_loop, seed)
    local oldtype = torch.getdefaulttensortype()
    torch.setdefaulttensortype('torch.FloatTensor')
    checkHalf()
-   initSeed(159243067)
+   initSeed(seed)
    mytester = torch.Tester()
    mytester:add(cunntest)
    mytester:run(tests)
