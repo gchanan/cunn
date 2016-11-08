@@ -35,7 +35,8 @@ function torch.CudaDoubleTensor:mean()
 end
 
 local function half_max_error(maxabs)
-  return maxabs and (10^(math.floor(math.log(maxabs) / math.log(2)))) * (2^(-10)) or 0
+  -- arbitrarily double the precision limit
+  return 2 * ((maxabs and (2^(math.floor(math.log(maxabs) / math.log(2)))) * (2^(-10))) or 0)
 end
 
 -- half has additional error on top of double/float
@@ -55,9 +56,10 @@ local function precision_backward_type(precision_b, tensor_type, maxabs)
    end
 end
 
-local function precision_backward_conv_weightbias(precision_b, tensor_type)
+local function precision_backward_conv_weightbias(precision_b, tensor_type, maxabs)
    if (tensor_type == 'torch.CudaHalfTensor') then
-      return 2 + precision_b -- cudnn uses 8 here
+      -- cudnn uses 8 here
+      return 1 + precision_b + half_max_error(maxabs)
    else
       return precision_b
    end
@@ -346,15 +348,18 @@ function cunntest.Square_transposed()
 end
 
 function cunntest.SoftShrink_forward()
-  pointwise_forward(nn.SoftShrink(math.random()), 'SoftShrink', precision_forward)
+  local r = ffi.C.THC_half2float(ffi.C.THC_float2half(math.random()))
+  pointwise_forward(nn.SoftShrink(r), 'SoftShrink', precision_forward)
 end
 
 function cunntest.SoftShrink_backward()
-  pointwise_backward(nn.SoftShrink(math.random()), 'SoftShrink', precision_backward)
+  local r = ffi.C.THC_half2float(ffi.C.THC_float2half(math.random()))
+  pointwise_backward(nn.SoftShrink(r), 'SoftShrink', precision_backward)
 end
 
 function cunntest.SoftShrink_transposed()
-  pointwise_transposed(nn.SoftShrink(math.random()), 'SoftShrink', precision_backward)
+  local r = ffi.C.THC_half2float(ffi.C.THC_float2half(math.random()))
+  pointwise_transposed(nn.SoftShrink(r), 'SoftShrink', precision_backward)
 end
 
 function cunntest.ELU_forward()
@@ -927,11 +932,14 @@ local function BatchNormalization_backward(moduleName, mode, inputSize, backward
       local werror = weightcuda:double() - groundweight:double()
       local berror = biascuda:double() - groundbias:double()
 
-      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename, rescuda:abs():max()),
+      mytester:assertlt(error:abs():max(),
+        precision_backward_type(precision_backward, typename, rescuda:abs():max()),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_type(precision_backward, typename, weightcuda:abs():max()),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_type(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_type(precision_backward, typename, biascuda:abs():max()),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_type(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
     end
 end
@@ -1125,12 +1133,14 @@ function cunntest.SpatialConvolutionMM_backward_single()
 
          mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
             string.format('error on state (backward) with %s', typename))
-         mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+         mytester:assertlt(werror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
             string.format('error on weight (backward) with %s', typename))
 
          if gconv.bias then
             local berror = gconv.gradBias:double() - groundbias:double()
-            mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+            mytester:assertlt(berror:abs():max(),
+                precision_backward_conv_weightbias(precision_backward, typename, gconv.gradBias:abs():max()),
                 string.format('error on bias (backward) with %s', typename))
          end
       end
@@ -1195,11 +1205,13 @@ function cunntest.SpatialConvolutionMM_backward_batch()
 
          mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
             string.format('error on state (backward) with %s', typename))
-         mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+         mytester:assertlt(werror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
             string.format('error on weight (backward) with %s', typename))
          if gconv.bias then
             local berror = gconv.gradBias:double() - groundbias:double()
-            mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+            mytester:assertlt(berror:abs():max(),
+                precision_backward_conv_weightbias(precision_backward, typename, gconv.gradBias:abs():max()),
                 string.format('error on bias (backward) with %s', typename))
          end
       end
@@ -1323,9 +1335,11 @@ function cunntest.SpatialConvolutionLocal_backward_single()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
           string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
           string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
           string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -1376,9 +1390,11 @@ function cunntest.SpatialConvolutionLocal_backward_batch()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
           string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
           string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
           string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -1538,12 +1554,14 @@ function cunntest.SpatialFullConvolution_backward_single()
 
          mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
             string.format('error on state (backward) with %s', typename))
-         mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+         mytester:assertlt(werror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
             string.format('error on weight (backward) with %s', typename))
 
          if gconv.bias then
             local berror = gconv.gradBias:double() - groundbias:double()
-            mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+            mytester:assertlt(berror:abs():max(),
+               precision_backward_conv_weightbias(precision_backward, typename, gconv.gradBias:abs():max()),
                string.format('error on bias (backward) with %s', typename))
          end
       end
@@ -1609,11 +1627,13 @@ function cunntest.SpatialFullConvolution_backward_batch()
 
          mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
             string.format('error on state (backward) with %s', typename))
-         mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+         mytester:assertlt(werror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
             string.format('error on weight (backward) with %s', typename))
          if gconv.bias then
             local berror = gconv.gradBias:double() - groundbias:double()
-            mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+            mytester:assertlt(berror:abs():max(),
+               precision_backward_conv_weightbias(precision_backward, typename, gconv.gradBias:abs():max()),
                string.format('error on bias (backward) with %s', typename))
          end
       end
@@ -1742,9 +1762,11 @@ function cunntest.SpatialDilatedConvolution_backward_single()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
          string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+         precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
          string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+         precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
          string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -1796,9 +1818,11 @@ function cunntest.SpatialDilatedConvolution_backward_batch()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
          string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+         precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
          string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+         precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
          string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -1940,12 +1964,6 @@ function cunntest.SpatialSubSampling_backward_batch()
    local inj = (outj-1)*sj+kj
 
    for k, typename in ipairs(typenames) do
-      -- FIXME: SpatialSubSampling accumulates directly to real, causes
-      -- precision issues with half
-      precision_backward_old = precision_backward
-      if typename == 'torch.CudaHalfTensor' then
-        precision_backward = 0.7
-      end
       local input = torch.randn(bs,from,inj,ini):type(typename)
       local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
 
@@ -1974,14 +1992,17 @@ function cunntest.SpatialSubSampling_backward_batch()
       local werror = weightcuda:double() - groundweight:double()
       local berror = biascuda:double() - groundbias:double()
 
-      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+      -- FIXME: SpatialSubSampling accumulates directly to real, causes
+      -- precision issues with half, so we double the error tolerance
+      mytester:assertlt(error:abs():max(),
+          2*precision_backward_type(precision_backward, typename, rescuda:abs():max()),
           string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_type(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+          2*precision_backward_type(precision_backward, typename, weightcuda:abs():max()),
           string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_type(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+          2*precision_backward_type(precision_backward, typename, biascuda:abs():max()),
           string.format('error on bias (backward) with %s', typename))
-
-      precision_backward = precision_backward_old
    end
 end
 
@@ -2502,6 +2523,10 @@ function cunntest.SpatialFractionalMaxPooling_backward()
             nn.SpatialFractionalMaxPooling(poolSizeW, poolSizeH, outW, outH)
             :fixPoolingRegions():type(ctype)
 
+        -- convert type of randomSamples and ensure we don't resample
+        module:initSampleBuffer_(input)
+        module:fixPoolingRegions()
+        module.randomSamples = module.randomSamples:type(typename):type(ctype)
         module:forward(input)
         module:zeroGradParameters()
         local groundgrad = module:backward(input, gradOutput)
@@ -3548,9 +3573,11 @@ function cunntest.TemporalConvolution_backward()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -3595,9 +3622,11 @@ function cunntest.TemporalConvolution_backward_batch()
 
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -4269,9 +4298,11 @@ function cunntest.VolumetricConvolution_backward_single()
         string.format('size mismatch on state (forward) with %s', typename))
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -4324,9 +4355,11 @@ function cunntest.VolumetricConvolution_backward_batch()
         string.format('size mismatch on state (forward) with %s', typename))
       mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -5033,9 +5066,11 @@ function cunntest.VolumetricDilatedConvolution()
         string.format('error on state (forward) with %s', typename))
       mytester:assertlt(gerror:abs():max(), precision_backward_type(precision_backward, typename),
         string.format('error on state (backward) with %s', typename))
-      mytester:assertlt(werror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(werror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
         string.format('error on weight (backward) with %s', typename))
-      mytester:assertlt(berror:abs():max(), precision_backward_conv_weightbias(precision_backward, typename),
+      mytester:assertlt(berror:abs():max(),
+        precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
 end
@@ -5084,10 +5119,10 @@ function cunntest.LookupTable_backward()
           local input, gradOutput
           if s.batch then
               input = torch.LongTensor(s.nInput, 5):random(s.nVocab)
-              gradOutput = torch.randn(s.nInput, 5, s.nDim):type(ctype)
+              gradOutput = torch.randn(s.nInput, 5, s.nDim):type(typename):type(ctype)
           else
               input = torch.LongTensor(s.nInput):random(s.nVocab)
-              gradOutput = torch.randn(s.nInput, s.nDim):type(ctype)
+              gradOutput = torch.randn(s.nInput, s.nDim):type(typename):type(ctype)
           end
 
           local sconv = nn.LookupTable(s.nVocab, s.nDim, s.paddingValue):type(ctype)
@@ -5106,7 +5141,8 @@ function cunntest.LookupTable_backward()
           gconv:backward(input, gradOutput)
 
           local weightGradError = gconv.gradWeight:double() - sconv.gradWeight:double()
-          mytester:assertlt(weightGradError:abs():max(), precision_backward_type(precision_backward, typename, gconv.gradWeight:abs():max()),
+          mytester:assertlt(weightGradError:abs():max(),
+              precision_backward_conv_weightbias(precision_backward, typename, gconv.gradWeight:abs():max()),
               'error on weight for size ' .. tostring(s.nInput) ..
               ' nVocab: ' .. tostring(s.nVocab) ..
               ' nDim ' .. tostring(s.nDim) ..
