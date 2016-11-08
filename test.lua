@@ -59,7 +59,7 @@ end
 local function precision_backward_conv_weightbias(precision_b, tensor_type, maxabs)
    if (tensor_type == 'torch.CudaHalfTensor') then
       -- cudnn uses 8 here
-      return 1 + precision_b + half_max_error(maxabs)
+      return 2 + precision_b + half_max_error(maxabs)
    else
       return precision_b
    end
@@ -932,8 +932,13 @@ local function BatchNormalization_backward(moduleName, mode, inputSize, backward
       local werror = weightcuda:double() - groundweight:double()
       local berror = biascuda:double() - groundbias:double()
 
+      local backerror = precision_backward_type(precision_backward, typename, rescuda:abs():max())
+      if typename == 'torch.CudaHalfTensor' and (mode == 'training') then
+        -- this correction is empirical; mean can be off by roughly 4e-4, multiplied by roughly stdval^2.
+        backerror = backerror + (sbnorm.save_std:max())^2 * 4e-4
+      end
       mytester:assertlt(error:abs():max(),
-        precision_backward_type(precision_backward, typename, rescuda:abs():max()),
+        backerror,
         string.format('error on state (backward) with %s', typename))
       mytester:assertlt(werror:abs():max(),
         precision_backward_type(precision_backward, typename, weightcuda:abs():max()),
