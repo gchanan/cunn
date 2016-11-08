@@ -4953,11 +4953,13 @@ function cunntest.VolumetricFullConvolution_pair_test()
       local gradgpu = module:backward(input:type(typename), gradOut:type(typename))
 
       local error = outgpu:type(typename) - outcpu:type(typename)
-      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+      mytester:assertlt(error:abs():max(),
+                        precision_forward_type(precision_forward, typename, outgpu:abs():max()),
                         string.format('error on state (forward) with %s', typename))
 
       local error = gradgpu:type(typename) - gradcpu:type(typename)
-      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+      mytester:assertlt(error:abs():max(),
+                        precision_backward_type(precision_backward, typename),
                         string.format('error on state (backward) with %s', typename))
     end
 end
