@@ -29,4 +29,35 @@ inline int GET_BLOCKS(const int N)
   } \
   THLongStorage_free(size2);
 
+#define THCUNN_check_shape(STATE, I1, I2)                 \
+  if (I1 != NULL && I2 != NULL && !THCTensor_(isSameSizeAs)(STATE, I1, I2))	\
+  { \
+       THCDescBuff s1 = THCTensor_(sizeDesc)(STATE, I1);  \
+       THCDescBuff s2 = THCTensor_(sizeDesc)(STATE, I2);  \
+       THError(#I1 " and " #I2 " shapes do not match: "   \
+               #I1 " %s, " #I2 " %s", s1.str, s2.str);    \
+  }
+
+#define THCUNN_check_nElement(STATE, I1, I2)                \
+  if (I1 != NULL && I2 != NULL ) {                          \
+    long n1 = THCTensor_(nElement)(STATE, I1);              \
+    long n2 = THCTensor_(nElement)(STATE, I2);              \
+    if (n1 != n2)                                           \
+    {	\
+      THCDescBuff s1 = THCTensor_(sizeDesc)(state, I1);     \
+      THCDescBuff s2 = THCTensor_(sizeDesc)(state, I2);     \
+      THError(#I1 " and " #I2 " have different number of elements: "	\
+              #I1 "%s has %ld elements, while "             \
+              #I2 "%s has %ld elements", s1.str, n1, s2.str, n2); \
+    }	\
+  }
+
+#define THCUNN_check_dim_size(STATE, T, DIM, DIM_SIZE, SIZE) \
+  if (THCTensor_(nDimension)(STATE, T) != DIM ||             \
+      THCTensor_(size)(STATE, T, DIM_SIZE) != SIZE) {        \
+      THCDescBuff s1 = THCTensor_(sizeDesc)(state, T);       \
+      THError("Need " #T " of dimension %d and " #T ".size[%d] == %d"	\
+              " but got " #T " to be of shape: %s", DIM, DIM_SIZE, SIZE, s1.str); \
+  }
+
 #endif
