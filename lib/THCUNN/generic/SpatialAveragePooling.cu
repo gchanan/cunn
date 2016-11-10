@@ -14,11 +14,11 @@ void THNN_(SpatialAveragePooling_updateOutput)(
 {
   THCUNN_assertSameGPU_generic(state, 2, input, output);
   THCUNN_argCheck(state, input->nDimension == 3 || input->nDimension == 4, 2, input,
-		"3D or 4D (batch mode) tensor expected for input, but got: %s");
+                  "3D or 4D (batch mode) tensor expected for input, but got: %s");
   THArgCheck(kW/2 >= padW && kH/2 >= padH, 2,
-	  "pad should be smaller than half of kernel size, but got "
-	  "padW = %d, padH = %d, kW = %d, kH = %d",
- 	  padW, padH, kW, kH);
+             "pad should be smaller than half of kernel size, but got "
+             "padW = %d, padH = %d, kW = %d, kH = %d",
+             padW, padH, kW, kH);
 
   long nInputCols, nInputRows, nInputPlane, batchSize;
   long nOutputCols, nOutputRows;
@@ -38,9 +38,9 @@ void THNN_(SpatialAveragePooling_updateOutput)(
   }
 
   THArgCheck(nInputCols >= kW - 2 * padW && nInputRows >= kH - 2 * padH, 2,
-	     "input image smaller than (kernel size - 2 * padW). Got "
-	     "inputHeight: %nInputCols inputWidth: %d kH %d kW %d padH %d padW %d",
-	     nInputRows, nInputCols, kH, kW, padH, padW);
+             "input image smaller than (kernel size - 2 * padW). Got "
+             "inputHeight: %nInputCols inputWidth: %d kH %d kW %d padH %d padW %d",
+             nInputRows, nInputCols, kH, kW, padH, padW);
 
   if(ceil_mode) {
     nOutputCols = ceil(float(nInputCols - kW + 2*padW) / float(dW)) + 1;

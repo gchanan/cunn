@@ -29,11 +29,11 @@ void THNN_(VolumetricAveragePooling_updateOutput)(
   if (THCTensor_(nDimension)(state, input) == 4)
   {
     THArgCheck(input->size[dimw] >= kW && input->size[dimh] >= kH
-      && input->size[dimt] >= kT, 2,
-      "input image (T: %d H: %d W: %d) smaller than "
-      "kernel size (kT: %d kH: %d kW: %d)",
-      input->size[dimt], input->size[dimh], input->size[dimw],
-      kT, kH, kW);
+               && input->size[dimt] >= kT, 2,
+               "input image (T: %d H: %d W: %d) smaller than "
+               "kernel size (kT: %d kH: %d kW: %d)",
+               input->size[dimt], input->size[dimh], input->size[dimw],
+               kT, kH, kW);
 
     /* sizes */
     batchSize   = 1;
@@ -45,11 +45,11 @@ void THNN_(VolumetricAveragePooling_updateOutput)(
   else if (THCTensor_(nDimension)(state, input) == 5)
   {
     THArgCheck(input->size[dimw] >= kW && input->size[dimh] >= kH
-      && input->size[dimt] >= kT, 2,
-      "input image (T: %d H: %d W: %d) smaller than "
-      "kernel size (kT: %d kH: %d kW: %d)",
-      input->size[dimt], input->size[dimh], input->size[dimw],
-      kT, kH, kW);
+               && input->size[dimt] >= kT, 2,
+               "input image (T: %d H: %d W: %d) smaller than "
+               "kernel size (kT: %d kH: %d kW: %d)",
+               input->size[dimt], input->size[dimh], input->size[dimw],
+               kT, kH, kW);
 
     /* sizes */
     batchSize   = THCTensor_(size)(state, input, 0);

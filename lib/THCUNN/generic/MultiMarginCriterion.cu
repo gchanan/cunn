@@ -51,7 +51,7 @@ void THNN_(MultiMarginCriterion_updateOutput)(
   {
     int nframe = input->size[0];
     THArgCheck((target->nDimension == 1) && (target->size[0] == nframe), 3,
-	       "inconsistent target size");
+               "inconsistent target size");
     THCTensor *output_ = THCTensor_(newWithSize1d)(state, input->size[0]);  // tmp outupt buffer
     dim3 blocks(input->size[0]);
     dim3 threads(MULTIMARGIN_THREADS);
@@ -145,7 +145,7 @@ void THNN_(MultiMarginCriterion_updateGradInput)(
   {
     int nframe = gradInput->size[0];
     THArgCheck((target->nDimension == 1) && (target->size[0] == nframe), 3,
-	       "inconsistent target size");
+               "inconsistent target size");
     dim3 blocks(gradInput->size[0]);
     dim3 threads(MULTIMARGIN_THREADS);
 

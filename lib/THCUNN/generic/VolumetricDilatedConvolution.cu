@@ -20,10 +20,10 @@ void THNN_(VolumetricDilatedConvolution_updateOutput)(
     THCUNN_assertSameGPU_generic(state, 2, weight, bias);
   }
   THCUNN_argCheck(state, input->nDimension == 4 || input->nDimension == 5, 2, input,
-    "4D or 5D (batch mode) tensor expected for input, but got: %s");
+                  "4D or 5D (batch mode) tensor expected for input, but got: %s");
   THCUNN_argCheck(state, weight->nDimension == 5, 4, weight,
-    "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
-    "expected for weight, but got: %s");
+                  "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
+                  "expected for weight, but got: %s");
   THArgCheck(!bias || weight->size[0] == bias->size[0], 4, "nOutputPlane mismatch in weight and bias");
   THArgCheck(kT > 0 && kW > 0 && kH > 0, 8, "kernel size should be greater than zero");
   THArgCheck(dT > 0 && dW > 0 && dH > 0, 10, "stride should be greater than zero");
@@ -172,13 +172,13 @@ void THNN_(VolumetricDilatedConvolution_updateGradInput)(
   THCUNN_assertSameGPU_generic(state, 5, input, gradOutput, weight,
                                  gradColumns, gradInput);
   THCUNN_argCheck(state, input->nDimension == 4 || input->nDimension == 5, 2, input,
-    "4D or 5D (batch mode) tensor expected for input, but got: %s");
+                  "4D or 5D (batch mode) tensor expected for input, but got: %s");
   THCUNN_argCheck(state, gradOutput->nDimension == 4 || gradOutput->nDimension == 5, 3,
-    gradOutput,
-    "4D or 5D (batch mode) tensor expected for gradOutput, but got: %s");
+                  gradOutput,
+                  "4D or 5D (batch mode) tensor expected for gradOutput, but got: %s");
   THCUNN_argCheck(state, weight->nDimension == 5, 4, weight,
-    "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
-    "expected for weight, but got: %s");
+                  "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
+                  "expected for weight, but got: %s");
   THArgCheck(kT > 0 && kW > 0 && kH > 0, 8, "kernel size should be greater than zero");
   THArgCheck(dT > 0 && dW > 0 && dH > 0, 10, "stride should be greater than zero");
 
@@ -286,13 +286,13 @@ void THNN_(VolumetricDilatedConvolution_accGradParameters)(
    THCUNN_assertSameGPU_generic(state, 2, gradWeight, gradBias);
   }
   THCUNN_argCheck(state, input->nDimension == 4 || input->nDimension == 5, 2, input,
-    "4D or 5D (batch mode) tensor expected for input, but got: %s");
+                  "4D or 5D (batch mode) tensor expected for input, but got: %s");
   THCUNN_argCheck(state, gradOutput->nDimension == 4 || gradOutput->nDimension == 5, 3,
-    gradOutput,
-    "4D or 5D (batch mode) tensor expected for gradOutput, but got: %s");
+                  gradOutput,
+                  "4D or 5D (batch mode) tensor expected for gradOutput, but got: %s");
   THCUNN_argCheck(state, gradWeight->nDimension == 5, 4, gradWeight,
-    "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
-    "expected for gradWeight, but got: %s");
+                  "5D (nOutputPlane x nInputPlane x kT x kH x kW) tensor "
+                  "expected for gradWeight, but got: %s");
   THArgCheck(kT > 0 && kW > 0 && kH > 0, 8, "kernel size should be greater than zero");
   THArgCheck(dT > 0 && dW > 0 && dH > 0, 10, "stride should be greater than zero");
 

@@ -45,11 +45,11 @@ void THNN_(VolumetricDilatedMaxPooling_updateOutput)(
   if (THCTensor_(nDimension)(state, input) == 4)
   {
     THArgCheck(input->size[dimw] >= kW && input->size[dimh] >= kH
-      && input->size[dimt] >= kT, 2,
-      "input image (T: %d H: %d W: %d) smaller than "
-      "kernel size (kT: %d kH: %d kW: %d)",
-      input->size[dimt], input->size[dimh], input->size[dimw],
-      kT, kH, kW);
+               && input->size[dimt] >= kT, 2,
+               "input image (T: %d H: %d W: %d) smaller than "
+               "kernel size (kT: %d kH: %d kW: %d)",
+               input->size[dimt], input->size[dimh], input->size[dimw],
+               kT, kH, kW);
 
     /* sizes */
     batchSize   = 1;
@@ -61,11 +61,11 @@ void THNN_(VolumetricDilatedMaxPooling_updateOutput)(
   else if (THCTensor_(nDimension)(state, input) == 5)
   {
     THArgCheck(input->size[dimw] >= kW && input->size[dimh] >= kH
-      && input->size[dimt] >= kT, 2,
-      "input image (T: %d H: %d W: %d) smaller than "
-      "kernel size (kT: %d kH: %d kW: %d)",
-      input->size[dimt], input->size[dimh], input->size[dimw],
-      kT, kH, kW);
+               && input->size[dimt] >= kT, 2,
+               "input image (T: %d H: %d W: %d) smaller than "
+               "kernel size (kT: %d kH: %d kW: %d)",
+               input->size[dimt], input->size[dimh], input->size[dimw],
+               kT, kH, kW);
 
     /* sizes */
     batchSize   = THCTensor_(size)(state, input, 0);
@@ -80,10 +80,10 @@ void THNN_(VolumetricDilatedMaxPooling_updateOutput)(
   }
 
   THArgCheck(kT/2 >= padT && kW/2 >= padW && kH/2 >= padH, 2,
-    "pad should be smaller than half of kernel size"
+             "pad should be smaller than half of kernel size"
   );
   THArgCheck(dilationT > 0 && dilationW > 0 && dilationH > 0, 14,
-    "dilation should be greater than 0"
+             "dilation should be greater than 0"
   );
 
   if (ceilMode)

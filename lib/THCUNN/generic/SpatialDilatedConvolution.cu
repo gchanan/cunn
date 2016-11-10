@@ -50,7 +50,7 @@ void THNN_(SpatialDilatedConvolution_updateOutput)(
   } else {
     THArgCheck(input->size[1] == nInputPlane, 2,
                "input channels %d and nInputPlane %d dont match",
-                input->size[1], nInputPlane);
+               input->size[1], nInputPlane);
   }
 
   long inputWidth   = input->size[3];

@@ -59,8 +59,8 @@ void THNN_(SpatialConvolutionMM_updateOutput)(
 
   if (outputWidth < 1 || outputHeight < 1)
     THError("Given input size: (%d x %d x %d). "
-      "Calculated output size: (%d x %d x %d). Output size is too small",
-      nInputPlane,inputHeight,inputWidth,nOutputPlane,outputHeight,outputWidth);
+            "Calculated output size: (%d x %d x %d). Output size is too small",
+            nInputPlane,inputHeight,inputWidth,nOutputPlane,outputHeight,outputWidth);
 
 
   // Batch size + input planes
@@ -307,7 +307,7 @@ void THNN_(SpatialConvolutionMM_accGradParameters)(
   THArgCheck(kW > 0 && kH > 0, 8,
              "kernel size should be greater than zero, but got kH: %d kW: %d", kH, kW);
   THArgCheck(dW > 0 && dH > 0, 10,
-            "stride should be greater than zero, but got dH: %d dW: %d", dH, dW);
+             "stride should be greater than zero, but got dH: %d dW: %d", dH, dW);
   THCUNN_argCheck(state, gradWeight->nDimension == 2 || gradWeight->nDimension == 4,
                   2, gradWeight, "2D or 4D gradWeight tensor expected, but got: %s");
 

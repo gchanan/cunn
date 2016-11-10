@@ -40,7 +40,7 @@ void THNN_(VolumetricMaxUnpooling_updateOutput)(
   else
   {
     THArgCheck(false, 2, "4D or 5D tensor expected, got %d",
-      THCTensor_(nDimension)(state, input));
+               THCTensor_(nDimension)(state, input));
   }
 
   if (input->nDimension == 4) /* 4D */
