@@ -12,8 +12,6 @@ void THNN_(Threshold_updateOutput)(
            real val,
            bool inplace)
 {
-  THCUNN_argCheck(state, input->nDimension == 4 || input->nDimension == 5, 2, input,
-                "4D or 5D (batch mode) tensor expected for input, but got: %s");
   THCUNN_assertSameGPU_generic(state, 2, input, output);
 
   if (inplace)
@@ -43,6 +41,7 @@ void THNN_(Threshold_updateGradInput)(
            real val,
            bool inplace)
 {
+  THCUNN_check_nElement(state, input, gradOutput);
   THCUNN_assertSameGPU_generic(state, 3, input, gradInput, gradOutput);
 
   if (inplace)
