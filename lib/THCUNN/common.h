@@ -60,4 +60,10 @@ inline int GET_BLOCKS(const int N)
               " but got " #T " to be of shape: %s", DIM, DIM_SIZE, SIZE, s1.str); \
   }
 
+#define THCUNN_argCheck(STATE, COND, ARG, T, FORMAT) \
+  if (!(COND)) { \
+    THCDescBuff s1 = THCTensor_(sizeDesc)(state, T); \
+    THArgCheck(COND, ARG, FORMAT, s1.str);           \
+  }
+
 #endif
