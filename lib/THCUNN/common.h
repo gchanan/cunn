@@ -22,8 +22,8 @@ inline int GET_BLOCKS(const int N)
 }
 
 #define THCUNN_resizeAs_indices(STATE, I1, I2)              \
-  THLongStorage *size2 = THCTensor_(newSizeOf)(STATE, I2); \
-  if (!THCudaLongTensor_isSize(STATE, I1, size2))           \
+  THLongStorage *size2 = THCTensor_(newSizeOf)(STATE, I2);  \
+  if (!THCIndexTensor_(isSize)(STATE, I1, size2))           \
   { \
     THCudaLongTensor_resize(STATE, I1, size2, NULL);        \
   } \
@@ -37,6 +37,18 @@ inline int GET_BLOCKS(const int N)
        THError(#I1 " and " #I2 " shapes do not match: "   \
                #I1 " %s, " #I2 " %s", s1.str, s2.str);    \
   }
+
+
+#define THCUNN_check_shape_indices(STATE, I1, I2)              \
+  THLongStorage *size2 = THCTensor_(newSizeOf)(STATE, I2);     \
+  if (!THCIndexTensor_(isSize)(STATE, I1, size2))              \
+  { \
+       THCDescBuff s1 = THCIndexTensor_(sizeDesc)(STATE, I1);  \
+       THCDescBuff s2 = THCTensor_(sizeDesc)(STATE, I2);       \
+       THError(#I1 " and " #I2 " shapes do not match: "        \
+               #I1 " %s, " #I2 " %s", s1.str, s2.str);         \
+  } \
+  THLongStorage_free(size2);
 
 #define THCUNN_check_nElement(STATE, I1, I2)                \
   if (I1 != NULL && I2 != NULL ) {                          \
