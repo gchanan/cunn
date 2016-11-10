@@ -180,6 +180,8 @@ void THNN_(SpatialConvolutionMM_updateGradInput)(
 
   THCUNN_assertSameGPU_generic(state, 5, input, gradOutput, weight,
                                  gradColumns, gradInput);
+  THCUNN_argCheck(state, input->nDimension == 3 || input->nDimension == 4, 2, input,
+                  "3D or 4D (batch mode) tensor expected for input, but got: %s");
   THArgCheck( weight->size[0] == gradOutput->size[input->nDimension == 4 ? 1 : 0], 3,
              "Number of output features is not equal to nOutputPlane" );
   THArgCheck(kW > 0 && kH > 0, 9,
@@ -297,7 +299,8 @@ void THNN_(SpatialConvolutionMM_accGradParameters)(
   if (gradBias) {
    THCUNN_assertSameGPU_generic(state, 2, gradWeight, gradBias);
   }
-  THArgCheck(input->nDimension == 3 || input->nDimension == 4, 2, "3D or 4D (batch mode) tensor is expected");
+  THCUNN_argCheck(state, input->nDimension == 3 || input->nDimension == 4, 2, input,
+                  "3D or 4D (batch mode) tensor expected for input, but got: %s");
   THArgCheck(!gradBias || gradWeight->size[0] == gradBias->size[0], 4, "nOutputPlane mismatch in gradWeight and gradBias");
   THArgCheck( gradWeight->size[0] == gradOutput->size[input->nDimension == 4 ? 1 : 0], 3,
              "Number of output features is not equal to nOutputPlane" );
