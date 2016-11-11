@@ -55,14 +55,14 @@ void THNN_(SpatialUpSamplingNearest_updateOutput)(
   int outputWidth = inputWidth * scale_factor;
 
    if (input->nDimension == 3) {
-    THCTensor_(resize3d)(state, output,
-                         THCTensor_(size)(state, input, 0),
-                         outputHeight, outputWidth);
+     THCTensor_(resize3d)(state, output,
+                          THCTensor_(size)(state, input, 0),
+                          outputHeight, outputWidth);
    } else {
-    THCTensor_(resize4d)(state, output,
-                         THCTensor_(size)(state, input, 0),
-                         THCTensor_(size)(state, input, 1),
-                         outputHeight, outputWidth);
+     THCTensor_(resize4d)(state, output,
+                          THCTensor_(size)(state, input, 0),
+                          THCTensor_(size)(state, input, 1),
+                          outputHeight, outputWidth);
   }
 
   input = THCTensor_(newContiguous)(state, input);
