@@ -61,7 +61,6 @@ void THNN_(SpatialUpSamplingBilinear_updateOutput)(
    0 , stream>>>(num_kernels, rheight, rwidth, idata, odata);
   THCudaCheck(cudaGetLastError());
   THCTensor_(free)(state, input);
-  THCTensor_(free)(state, output);
 }
 
 
