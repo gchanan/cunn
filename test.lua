@@ -9,7 +9,7 @@ local times = {}
 
 local typenames = {
   'torch.CudaTensor',
-  'torch.CudaDoubleTensor',
+  --'torch.CudaDoubleTensor',
 }
 
 local t2cpu = {
@@ -20,7 +20,7 @@ local t2cpu = {
 
 local function checkHalf()
    if cutorch.hasHalf then
-       table.insert(typenames, 'torch.CudaHalfTensor')
+       --table.insert(typenames, 'torch.CudaHalfTensor')
        t2cpu['torch.CudaHalfTensor'] = 'torch.FloatTensor'
    end
 end
@@ -3843,7 +3843,7 @@ function cunntest.SpatialUpSamplingNearest_backward_batch()
    end
 end
 
-function cunntest.SpatialUpSamplingBilinear_forward()
+function cunntest.SpatialUpSamplingBilinear_forward2()
    local f = torch.random(3, 15)
    local h = torch.random(3, 15)
    local w = torch.random(3, 15)
@@ -3861,6 +3861,8 @@ function cunntest.SpatialUpSamplingBilinear_forward()
       local gconv = sconv:clone():type(typename)
       local rescuda = gconv:forward(input)
 
+      print(rescuda:size())
+      print(groundtruth:size())
       local error = rescuda:double() - groundtruth:double()
       mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
                         string.format('error on state (forward) with %s', typename))
