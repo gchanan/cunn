@@ -43,6 +43,7 @@ void THNN_(SpatialUpSamplingBilinear_updateOutput)(
         inputHeight, inputWidth,
         outputHeight, outputWidth);
   input = THCTensor_(newContiguous)(state, input);
+  THCUNN_assertSameGPU(state, 2, input, output);
   THCTensor_(resize4d)(state, output,
                        THCTensor_(size)(state, input, 0),
                        THCTensor_(size)(state, input, 1),
