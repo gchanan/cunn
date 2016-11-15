@@ -9,7 +9,7 @@ local times = {}
 
 local typenames = {
   'torch.CudaTensor',
-  --'torch.CudaDoubleTensor',
+  'torch.CudaDoubleTensor',
 }
 
 local t2cpu = {
