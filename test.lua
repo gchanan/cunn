@@ -69,18 +69,19 @@ local function makeNonContiguous(tensor)
   local s=torch.LongStorage(tensor:size():size()+1)
   for i=1,tensor:size():size() do s[i] = tensor:size()[i] end
   s[s:size()] = math.random(2,10)
-  local y = torch[tensor:type():match('torch.(%a+)')](s)
-  y=y:select(s:size(), 1)
-  y:copy(tensor)
-  assert(not y:isContiguous() or (y:nElement() == 1))
-  return y
+  local y = torch[tensor:type():match('torch.(%a+)')]()
+  y:resize(s)
+  local z=y:select(s:size(), 1)
+  z:copy(tensor)
+  assert(not z:isContiguous() or (z:nElement() == 1))
+  return z
 end
 
 local function pointwise_forward(proto_module, name, max_error)
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
       local ctype = t2cpu[typename]
       local input = makeNonContiguous(input:type(ctype))
       if name == 'Sqrt' then input:abs() end
@@ -101,8 +102,8 @@ local function pointwise_backward(proto_module, name, max_error)
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
+      local gradOutput = torch.randn(size):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -129,7 +130,7 @@ local function pointwise_backward_inplace(proto_module, name)
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
       local ctype = t2cpu[typename]
       input = input:type(ctype)
       if name == 'Sqrt' then input:abs() end
@@ -431,7 +432,7 @@ function cunntest.LogSoftMax_forward_batch()
    local bs = math.random(32,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs, size):type(typename))
+      local input = torch.randn(bs, size):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.LogSoftMax():type(ctype)
@@ -452,8 +453,8 @@ function cunntest.LogSoftMax_backward_batch()
    local bs = math.random(32,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs, size):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs, size):type(typename))
+      local input = torch.randn(bs, size):type(typename)
+      local gradOutput = torch.randn(bs, size):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -480,7 +481,7 @@ function cunntest.SpatialLogSoftMax_forward()
    local inj = math.random(8,32)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size, inj, ini):type(typename))
+      local input = torch.randn(size, inj, ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialLogSoftMax():type(ctype)
@@ -503,8 +504,8 @@ function cunntest.SpatialLogSoftMax_backward()
    local inj = math.random(8,32)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size, inj, ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(size, inj, ini):type(typename))
+      local input = torch.randn(size, inj, ini):type(typename)
+      local gradOutput = torch.randn(size, inj, ini):type(typename)
       local ctype = t2cpu[typename]
       input = input:type(ctype)
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -532,7 +533,7 @@ function cunntest.SpatialLogSoftMax_forward_batch()
    local inj = math.random(8,32)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs, size, inj, ini):type(typename))
+      local input = torch.randn(bs, size, inj, ini):type(typename)
       local ctype = t2cpu[typename]
       input = input:type(ctype)
       local sconv = nn.SpatialLogSoftMax():type(ctype)
@@ -556,8 +557,8 @@ function cunntest.SpatialLogSoftMax_backward_batch()
    local inj = math.random(8,32)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs, size, inj, ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs, size, inj, ini):type(typename))
+      local input = torch.randn(bs, size, inj, ini):type(typename)
+      local gradOutput = torch.randn(bs, size, inj, ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -808,7 +809,7 @@ function cunntest.SparseLinear_backward()
             local groundbias = sslin.gradBias
 
             for i,v in ipairs(input) do input[i] = input[i]:type(typename) end
-            gradOutput = makeNonContiguous(gradOutput:type(typename))
+            gradOutput = gradOutput:type(typename)
             gslin:forward(input)
             local rescuda = gslin:backward(input, gradOutput)
             gslin:zeroGradParameters()
@@ -842,7 +843,7 @@ local function BatchNormalization_forward(moduleName, inputSize)
    local planes = inputSize[2]
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(table.unpack(inputSize)):type(typename))
+      local input = torch.randn(table.unpack(inputSize)):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -871,7 +872,7 @@ local function BatchNormalization_forward_inference(moduleName, inputSize)
    local planes = inputSize[2]
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(table.unpack(inputSize)):type(typename))
+      local input = torch.randn(table.unpack(inputSize)):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -905,8 +906,8 @@ local function BatchNormalization_backward(moduleName, mode, inputSize, backward
    local planes = inputSize[2]
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(table.unpack(inputSize)):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(table.unpack(inputSize)):type(typename))
+      local input = torch.randn(table.unpack(inputSize)):type(typename)
+      local gradOutput = torch.randn(table.unpack(inputSize)):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1016,7 +1017,7 @@ function cunntest.SpatialConvolutionMM_forward_single()
    local function jacTests(noBias)
       noBias = noBias or false
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+         local input = torch.randn(from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1065,7 +1066,7 @@ function cunntest.SpatialConvolutionMM_forward_batch()
    local function jacTests(noBias)
       noBias = noBias or false
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+         local input = torch.randn(bs,from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1113,8 +1114,8 @@ function cunntest.SpatialConvolutionMM_backward_single()
       noBias = noBias or false
 
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-         local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+         local input = torch.randn(from,inj,ini):type(typename)
+         local gradOutput = torch.randn(to,outj,outi):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1185,8 +1186,8 @@ function cunntest.SpatialConvolutionMM_backward_batch()
       noBias = noBias or false
 
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(bs,from,inj,ini))
-         local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi))
+         local input = torch.randn(bs,from,inj,ini)
+         local gradOutput = torch.randn(bs,to,outj,outi)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1252,7 +1253,7 @@ function cunntest.SpatialConvolutionLocal_forward_single()
    local inj = (outj-1)*sj+kj-padH*2
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1287,7 +1288,7 @@ function cunntest.SpatialConvolutionLocal_forward_batch()
    local inj = (outj-1)*sj+kj-padH*2
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1321,8 +1322,8 @@ function cunntest.SpatialConvolutionLocal_backward_single()
    local inj = (outj-1)*sj+kj-padH*2
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1376,8 +1377,8 @@ function cunntest.SpatialConvolutionLocal_backward_batch()
    local inj = (outj-1)*sj+kj-padH*2
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1434,7 +1435,7 @@ function cunntest.SpatialFullConvolution_forward_single()
    local function jacTests(noBias)
       noBias = noBias or false
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+         local input = torch.randn(from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1485,7 +1486,7 @@ function cunntest.SpatialFullConvolution_forward_batch()
    local function jacTests(noBias)
       noBias = noBias or false
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+         local input = torch.randn(bs,from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1535,7 +1536,7 @@ function cunntest.SpatialFullConvolution_backward_single()
    local function jacTests(noBias)
       noBias = noBias or false
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+         local input = torch.randn(from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1608,7 +1609,7 @@ function cunntest.SpatialFullConvolution_backward_batch()
       noBias = noBias or false
 
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+         local input = torch.randn(bs,from,inj,ini):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -1676,7 +1677,7 @@ function cunntest.SpatialDilatedConvolution_forward_single()
    local inj = (outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1713,7 +1714,7 @@ function cunntest.SpatialDilatedConvolution_forward_batch()
    local inj = (outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1749,7 +1750,7 @@ function cunntest.SpatialDilatedConvolution_backward_single()
    local inj = (outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1805,7 +1806,7 @@ function cunntest.SpatialDilatedConvolution_backward_batch()
    local inj = (outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1856,7 +1857,7 @@ function cunntest.SpatialSubSampling_forward()
    local inj = (outj-1)*sj+kj
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1889,7 +1890,7 @@ function cunntest.Sampling_forward_batch()
    local inj = (outj-1)*sj+kj
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -1927,12 +1928,12 @@ function cunntest.SpatialSubSampling_backward()
       if typename == 'torch.CudaHalfTensor' then
           precision_backward = 0.4
       end
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
-      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      gradOutput = gradOutput:type(ctype)
       local sconv = nn.SpatialSubSampling(from,ki,kj,si,sj):type(ctype)
       sconv:forward(input)
       sconv:zeroGradParameters()
@@ -1941,7 +1942,7 @@ function cunntest.SpatialSubSampling_backward()
       local groundbias = sconv.gradBias
 
       input = makeNonContiguous(input:type(typename))
-      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      gradOutput = gradOutput:type(typename)
       local gconv = nn.SpatialSubSampling(from,ki,kj,si,sj):type(typename)
       gconv.weight = sconv.weight:type(typename)
       gconv.bias = sconv.bias:type(typename)
@@ -1980,12 +1981,12 @@ function cunntest.SpatialSubSampling_backward_batch()
    local inj = (outj-1)*sj+kj
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
-      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      gradOutput = gradOutput:type(ctype)
       local sconv = nn.SpatialSubSampling(from,ki,kj,si,sj):type(ctype)
       sconv:forward(input)
       sconv:zeroGradParameters()
@@ -1994,7 +1995,7 @@ function cunntest.SpatialSubSampling_backward_batch()
       local groundbias = sconv.gradBias
 
       input = makeNonContiguous(input:type(typename))
-      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      gradOutput = gradOutput:type(typename)
       local gconv = nn.SpatialSubSampling(from,ki,kj,si,sj):type(typename)
       gconv.weight = sconv.weight:type(typename)
       gconv.bias = sconv.bias:type(typename)
@@ -2038,7 +2039,7 @@ function cunntest.SpatialMaxPooling_forward()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj):type(ctype)
@@ -2076,7 +2077,7 @@ function cunntest.SpatialMaxPooling_forward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialMaxPooling(ki,kj,si,sj,padi,padj):type(ctype)
@@ -2117,7 +2118,7 @@ function cunntest.SpatialMaxUnpooling_forward_batch()
       if ceil_mode then pooler:ceil() end
       local sunpool = nn.SpatialMaxUnpooling(pooler):type(ctype)
 
-      local original = makeNonContiguous(torch.randn(bs,from,outj,outi):type(typename))
+      local original = torch.randn(bs,from,outj,outi):type(typename)
       original = makeNonContiguous(original:type(ctype))
       local input = pooler:forward(original)
       local groundtruth = sunpool:forward(input)
@@ -2152,8 +2153,8 @@ function cunntest.SpatialMaxPooling_backward()
    local ceil_mode = true--math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2196,8 +2197,8 @@ function cunntest.SpatialMaxPooling_backward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       local input = makeNonContiguous(input:type(ctype))
       local gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2245,10 +2246,10 @@ function cunntest.SpatialMaxUnpooling_backward_batch()
       if ceil_mode then pooler:ceil() end
       local sunpool = nn.SpatialMaxUnpooling(pooler):type(ctype)
 
-      local original = makeNonContiguous(torch.randn(bs,from,outj,outi):type(typename))
+      local original = torch.randn(bs,from,outj,outi):type(typename)
       original = makeNonContiguous(original:type(ctype))
       local input = pooler:forward(original)
-      local gradOutput = makeNonContiguous(torch.randn(original:size()):type(typename))
+      local gradOutput = torch.randn(original:size()):type(typename)
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
       sunpool:forward(input)
       sunpool:zeroGradParameters()
@@ -2291,7 +2292,7 @@ function cunntest.SpatialDilatedMaxPooling_forward()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialDilatedMaxPooling(ki,kj,si,sj,padi,padj,dilationi,dilationj):type(ctype)
@@ -2331,7 +2332,7 @@ function cunntest.SpatialDilatedMaxPooling_forward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialDilatedMaxPooling(ki,kj,si,sj,padi,padj,dilationi,dilationj):type(ctype)
@@ -2367,8 +2368,8 @@ function cunntest.SpatialDilatedMaxPooling_backward()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2412,8 +2413,8 @@ function cunntest.SpatialDilatedMaxPooling_backward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2459,9 +2460,9 @@ function cunntest.SpatialFractionalMaxPooling_forward()
     for k, typename in ipairs(typenames) do
         local input = nil
         if batch == 1 then
-            input = makeNonContiguous(torch.Tensor(plane, inH, inW):uniform():type(typename))
+            input = torch.Tensor(plane, inH, inW):uniform():type(typename)
         else
-            input = makeNonContiguous(torch.Tensor(batch, plane, inH, inW):uniform():type(typename))
+            input = torch.Tensor(batch, plane, inH, inW):uniform():type(typename)
         end
 
         local ctype = t2cpu[typename]
@@ -2525,11 +2526,11 @@ function cunntest.SpatialFractionalMaxPooling_backward()
         local input = nil
         local gradOutput = nil
         if batch == 1 then
-            input = makeNonContiguous(torch.Tensor(plane, inH, inW):uniform():type(typename))
-            gradOutput = makeNonContiguous(torch.Tensor(plane, outH, outW):uniform():type(typename))
+            input = torch.Tensor(plane, inH, inW):uniform():type(typename)
+            gradOutput = torch.Tensor(plane, outH, outW):uniform():type(typename)
         else
-            input = makeNonContiguous(torch.Tensor(batch, plane, inH, inW):uniform():type(typename))
-            gradOutput = makeNonContiguous(torch.Tensor(batch, plane, outH, outW):uniform():type(typename))
+            input = torch.Tensor(batch, plane, inH, inW):uniform():type(typename)
+            gradOutput = torch.Tensor(batch, plane, outH, outW):uniform():type(typename)
         end
 
         local ctype = t2cpu[typename]
@@ -2605,7 +2606,7 @@ function cunntest.SpatialAveragePooling_forward()
    local count_exclude_pad = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -2644,7 +2645,7 @@ function cunntest.SpatialAveragePooling_forward_batch()
    local count_exclude_pad = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
 
       input = makeNonContiguous(input:type(ctype))
@@ -2682,8 +2683,8 @@ function cunntest.SpatialAveragePooling_backward()
    local count_exclude_pad = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -2729,8 +2730,8 @@ function cunntest.SpatialAveragePooling_backward_batch()
    local count_exclude_pad = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -2767,7 +2768,7 @@ function cunntest.SpatialAdaptiveMaxPooling_forward()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialAdaptiveMaxPooling(outi,outj):type(ctype)
@@ -2795,7 +2796,7 @@ function cunntest.SpatialAdaptiveMaxPooling_forward_noncontig()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input0 = makeNonContiguous(torch.randn(from,ini,inj):type(typename))
+      local input0 = torch.randn(from,ini,inj):type(typename)
       local ctype = t2cpu[typename]
       local input = makeNonContiguous(input0:type(ctype):transpose(2,3))
       local sconv = nn.SpatialAdaptiveMaxPooling(outi,outj):type(ctype)
@@ -2824,7 +2825,7 @@ function cunntest.SpatialAdaptiveMaxPooling_forward_batch()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SpatialAdaptiveMaxPooling(outi,outj):type(ctype)
@@ -2849,8 +2850,8 @@ function cunntest.SpatialAdaptiveMaxPooling_backward()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2882,8 +2883,8 @@ function cunntest.SpatialAdaptiveMaxPooling_backward_noncontig()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input0 = makeNonContiguous(torch.randn(from,ini,inj):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to,outj,outi):type(typename))
+      local input0 = torch.randn(from,ini,inj):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       local input = makeNonContiguous(input0:type(ctype):transpose(2,3))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -2916,8 +2917,8 @@ function cunntest.SpatialAdaptiveMaxPooling_backward_batch()
    local inj = math.random(10,256)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outj,outi):type(typename))
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -3072,8 +3073,8 @@ function cunntest.BCECriterion_forward()
   local size = math.random(1,100)
 
   for k, typename in ipairs(typenames) do
-     local input = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
-     local target = makeNonContiguous(torch.Tensor(size):uniform():gt(0.5):type(torch.type(input)))
+     local input = torch.Tensor(size):uniform():type(typename)
+     local target = torch.Tensor(size):uniform():gt(0.5):type(torch.type(input))
 
      local ctype = t2cpu[typename]
      input = makeNonContiguous(input:type(ctype))
@@ -3106,9 +3107,9 @@ end
 function cunntest.BCECriterionWeights_forward()
   local size = math.random(1,100)
   for k, typename in ipairs(typenames) do
-     local input = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
-     local target = makeNonContiguous(torch.Tensor(size):uniform():gt(0.5):type(torch.type(input)))
-     local weights = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
+     local input = torch.Tensor(size):uniform():type(typename)
+     local target = torch.Tensor(size):uniform():gt(0.5):type(torch.type(input))
+     local weights = torch.Tensor(size):uniform():type(typename)
 
      local ctype = t2cpu[typename]
      input = makeNonContiguous(input:type(ctype))
@@ -3146,8 +3147,8 @@ function cunntest.MarginCriterion_forward()
   local size = math.random(1,100)
 
   for k, typename in ipairs(typenames) do
-    local input = makeNonContiguous(((torch.rand(size)-0.5) * 2):type(typename)) -- data spread from -1 to 1
-    local target = makeNonContiguous(((torch.round(torch.rand(size))*2)-1):type(typename)) -- generate random labels -1, 1
+    local input = ((torch.rand(size)-0.5) * 2):type(typename) -- data spread from -1 to 1
+    local target = ((torch.round(torch.rand(size))*2)-1):type(typename)-- generate random labels -1, 1
 
     local ctype = t2cpu[typename]
     input = makeNonContiguous(input:type(ctype))
@@ -3169,7 +3170,7 @@ function cunntest.MultiLabelMarginCriterion_forward()
   local size = math.random(1,100)
 
   for k, typename in ipairs(typenames) do
-     local input = makeNonContiguous(((torch.rand(size)-0.5) * 2):type(typename)) -- data spread from -1 to 1
+     local input = ((torch.rand(size)-0.5) * 2):type(typename)-- data spread from -1 to 1
      local target = makeNonContiguous(torch.round(torch.rand(size)*(size-1)):add(1)) -- generate random labels > 0
      local zero = math.random(0,size) -- turn some labels into 0 targets
      if zero > 0 then
@@ -3194,8 +3195,8 @@ function cunntest.MultiLabelMarginCriterion_backward()
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(((torch.rand(size)-0.5) * 2):type(typename)) -- data spread from -1 to 1
-      local target = makeNonContiguous(torch.round(torch.rand(size)*(size-1)):add(1)) -- generate random labels > 0
+      local input = ((torch.rand(size)-0.5) * 2):type(typename) -- data spread from -1 to 1
+      local target = torch.round(torch.rand(size)*(size-1)):add(1) -- generate random labels > 0
       local zero = math.random(0,size) -- turn some labels into 0 targets
       if zero > 0 then
          target:sub(size-zero+1,size):zero()
@@ -3230,7 +3231,7 @@ function cunntest.SpatialCrossMapLRN_forward_batch()
    local k = math.random(1,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(bs, nbfeatures, inputSize, inputSize):type(typename))
+      local input = torch.rand(bs, nbfeatures, inputSize, inputSize):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3257,8 +3258,8 @@ function cunntest.SpatialCrossMapLRN_backward_batch()
    local k = math.random(1,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(bs, nbfeatures, inputSize, inputSize):type(typename))
-      local gradOutput = makeNonContiguous(torch.rand(input:size()):type(typename))
+      local input = torch.rand(bs, nbfeatures, inputSize, inputSize):type(typename)
+      local gradOutput = torch.rand(input:size()):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3286,8 +3287,8 @@ function cunntest.MarginCriterion_backward()
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(((torch.rand(size)-0.5) * 2):type(typename)) -- data spread from -1 to 1
-      local target = makeNonContiguous(((torch.round(torch.rand(size))*2)-1):type(typename)) -- generate random labels -1, 1
+      local input = ((torch.rand(size)-0.5) * 2):type(typename) -- data spread from -1 to 1
+      local target = ((torch.round(torch.rand(size))*2)-1):type(typename) -- generate random labels -1, 1
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3313,8 +3314,8 @@ function cunntest.BCECriterion_backward()
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
-      local target = makeNonContiguous(torch.Tensor(size):uniform():gt(0.5):type(torch.type(input)))
+      local input = torch.Tensor(size):uniform():type(typename)
+      local target = torch.Tensor(size):uniform():gt(0.5):type(torch.type(input))
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3340,9 +3341,9 @@ function cunntest.BCECriterionWeights_backward()
   local size = math.random(1,100)
 
   for k, typename in ipairs(typenames) do
-     local input = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
-     local target = makeNonContiguous(torch.Tensor(size):uniform():gt(0.5):type(torch.type(input)))
-     local weights = makeNonContiguous(torch.Tensor(size):uniform():type(typename))
+     local input = torch.Tensor(size):uniform():type(typename)
+     local target = torch.Tensor(size):uniform():gt(0.5):type(torch.type(input))
+     local weights = torch.Tensor(size):uniform():type(typename)
 
      local ctype = t2cpu[typename]
      input = makeNonContiguous(input:type(ctype))
@@ -3370,8 +3371,8 @@ function cunntest.mse()
    for sizeAverage = 0, 1 do
       for k, typename in ipairs(typenames) do
          local size = math.random(3000,5000)
-         local input = makeNonContiguous(torch.randn(size,1,1):type(typename))
-         local target = makeNonContiguous(torch.randn(size):type(typename))
+         local input = torch.randn(size,1,1):type(typename)
+         local target = torch.randn(size):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -3404,8 +3405,8 @@ function cunntest.SmoothL1()
       local size = math.random(3000,5000)
 
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(size,1,1):type(typename))
-         local target = makeNonContiguous(torch.randn(size):type(typename))
+         local input = torch.randn(size,1,1):type(typename)
+         local target = torch.randn(size):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -3436,8 +3437,8 @@ function cunntest.SoftMarginCriterion()
    for sizeAverage = 0, 1 do
       for k, typename in ipairs(typenames) do
          local size = math.random(3000,5000)
-         local input = makeNonContiguous(torch.randn(size,1,1):type(typename))
-         local target = makeNonContiguous(torch.randn(size):type(typename))
+         local input = torch.randn(size,1,1):type(typename)
+         local target = torch.randn(size):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -3467,8 +3468,8 @@ function cunntest.distkldiv()
       local size = math.random(3000,5000)
 
       for k, typename in ipairs(typenames) do
-         local input = makeNonContiguous(torch.randn(size):type(typename)) -- TODO, make it back to (size, 1, 1), see https://github.com/torch/cunn/issues/245#issuecomment-209260954
-         local target = makeNonContiguous(torch.randn(size):type(typename))
+         local input = torch.randn(size):type(typename) -- TODO, make it back to (size, 1, 1), see https://github.com/torch/cunn/issues/245#issuecomment-209260954
+         local target = torch.randn(size):type(typename)
 
          local ctype = t2cpu[typename]
          input = makeNonContiguous(input:type(ctype))
@@ -3502,7 +3503,7 @@ function cunntest.TemporalConvolution_forward()
    local ini = (outi-1)*si+ki -- nInputFrame
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(ini,from):type(typename))
+      local input = torch.randn(ini,from):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3531,7 +3532,7 @@ function cunntest.TemporalConvolution_forward_batch()
    local ini = (outi-1)*si+ki
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,ini,from):type(typename))
+      local input = torch.randn(bs,ini,from):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3559,12 +3560,12 @@ function cunntest.TemporalConvolution_backward()
    local ini = (outi-1)*si+ki
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(ini,from):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(outi,to):type(typename))
+      local input = torch.randn(ini,from):type(typename)
+      local gradOutput = torch.randn(outi,to):type(typename)
 
       local ctype = t2cpu[typename]
-      input = makeNonContiguous(input:type(ctype))
-      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      input = input:type(ctype)
+      gradOutput = gradOutput:type(ctype)
       local sconv = nn.TemporalConvolution(from,to,ki,si):type(ctype)
       sconv:forward(input)
       sconv:zeroGradParameters()
@@ -3572,8 +3573,8 @@ function cunntest.TemporalConvolution_backward()
       local groundweight = sconv.gradWeight
       local groundbias = sconv.gradBias
 
-      input = makeNonContiguous(input:type(typename))
-      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      input = input:type(typename)
+      gradOutput = gradOutput:type(typename)
       local gconv = nn.TemporalConvolution(from,to,ki,si):type(typename)
       gconv.weight = sconv.weight:type(typename)
       gconv.bias = sconv.bias:type(typename)
@@ -3608,8 +3609,8 @@ function cunntest.TemporalConvolution_backward_batch()
    local ini = (outi-1)*si+ki
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,ini,from):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,outi,to):type(typename))
+      local input = torch.randn(bs,ini,from):type(typename)
+      local gradOutput = torch.randn(bs,outi,to):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3699,7 +3700,7 @@ function cunntest.SoftPlus_forward()
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.SoftPlus():type(ctype)
@@ -3719,8 +3720,8 @@ function cunntest.SoftPlus_backward()
    local size = math.random(1,100)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
+      local gradOutput = torch.randn(size):type(typename)
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       gradOutput = makeNonContiguous(gradOutput:type(ctype))
@@ -3747,7 +3748,7 @@ function cunntest.SpatialUpSamplingNearest_forward()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(f, h, w):type(typename))
+      local input = torch.randn(f, h, w):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3772,7 +3773,7 @@ function cunntest.SpatialUpSamplingNearest_forward_batch()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(nbatch, f, h, w):type(typename))
+      local input = torch.randn(nbatch, f, h, w):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3796,8 +3797,8 @@ function cunntest.SpatialUpSamplingNearest_backward()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(f, h, w):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(f, h*scale, w*scale):type(typename))
+      local input = torch.randn(f, h, w):type(typename)
+      local gradOutput = torch.randn(f, h*scale, w*scale):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3829,8 +3830,8 @@ function cunntest.SpatialUpSamplingNearest_backward_batch()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(nbatch, f, h, w):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(nbatch, f, h*scale, w*scale):type(typename))
+      local input = torch.randn(nbatch, f, h, w):type(typename)
+      local gradOutput = torch.randn(nbatch, f, h*scale, w*scale):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3861,7 +3862,7 @@ function cunntest.SpatialUpSamplingBilinear_forward()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(f, h, w):type(typename))
+      local input = torch.randn(f, h, w):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3886,7 +3887,7 @@ function cunntest.SpatialUpSamplingBilinear_forward_batch()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(nbatch, f, h, w):type(typename))
+      local input = torch.randn(nbatch, f, h, w):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3910,8 +3911,8 @@ function cunntest.SpatialUpSamplingBilinear_backward()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(f, h, w):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(f, h*scale, w*scale):type(typename))
+      local input = torch.randn(f, h, w):type(typename)
+      local gradOutput = torch.randn(f, h*scale, w*scale):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3943,8 +3944,8 @@ function cunntest.SpatialUpSamplingBilinear_backward_batch()
    local scale = torch.random(2,5)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(nbatch, f, h, w):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(nbatch, f, h*scale, w*scale):type(typename))
+      local input = torch.randn(nbatch, f, h, w):type(typename)
+      local gradOutput = torch.randn(nbatch, f, h*scale, w*scale):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -3972,7 +3973,7 @@ function cunntest.l1cost()
    local size = math.random(300,500)
 
    for k, typename in ipairs(typenames) do
-     local input = makeNonContiguous(torch.randn(size):type(typename))
+     local input = torch.randn(size):type(typename)
 
      local ctype = t2cpu[typename]
      input = makeNonContiguous(input:type(ctype))
@@ -4002,7 +4003,7 @@ function cunntest.ClassNLLCriterionSingleTarget()
    local size = math.random(3000,5000)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
       local target = 1
 
       local ctype = t2cpu[typename]
@@ -4031,9 +4032,9 @@ function cunntest.ClassNLLCriterionSingleTargetWeights()
    local size = math.random(3000,5000)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size):type(typename))
+      local input = torch.randn(size):type(typename)
       local target = 1
-      local weights = makeNonContiguous(torch.rand(size):type(typename))
+      local weights = torch.rand(size):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4063,7 +4064,7 @@ function cunntest.ClassNLLCriterionMultipleTarget()
    local size = math.random(3000,5000)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size, size):type(typename))
+      local input = torch.randn(size, size):type(typename)
       local target = makeNonContiguous(torch.randperm(size))
 
       local ctype = t2cpu[typename]
@@ -4097,7 +4098,7 @@ function cunntest.SpatialClassNLLCriterion()
    local classes = math.random(10,30)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(batchSize, classes, h, w):type(typename))
+      local input = torch.randn(batchSize, classes, h, w):type(typename)
       local target = makeNonContiguous(torch.Tensor(batchSize, h, w))
       target:apply(function() return math.random(1, classes) end)
       local ctype = t2cpu[typename]
@@ -4128,9 +4129,9 @@ function cunntest.ClassNLLCriterionMultipleTargetWeights()
    local size = math.random(3000,5000)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(size, size):type(typename))
+      local input = torch.randn(size, size):type(typename)
       local target = makeNonContiguous(torch.randperm(size))
-      local weights = makeNonContiguous(torch.rand(size):type(typename))
+      local weights = torch.rand(size):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4163,7 +4164,7 @@ function cunntest.TemporalMaxPooling()
 
    for i, setting in ipairs(settings) do
       for k, typename in ipairs(typenames) do
-        local input = makeNonContiguous(torch.rand(16, 18, 3):type(typename))
+        local input = torch.rand(16, 18, 3):type(typename)
 
         local ctype = t2cpu[typename]
         input = makeNonContiguous(input:type(ctype))
@@ -4208,14 +4209,13 @@ function cunntest.VolumetricConvolution_forward_single()
 
    for k, typename in ipairs(typenames) do
       local input = torch.randn(from,ini,inj,ink):type(typename)
-      --input = makeNonContiguous(input)
 
       local ctype = t2cpu[typename]
-      input = makeNonContiguous(input:type(ctype)) -- input:type(ctype) --makeNonContiguous(input:type(ctype))
+      input = makeNonContiguous(input:type(ctype))
       local sconv = nn.VolumetricConvolution(from,to,ki,kk,kj,si,sk,sj):type(ctype)
       local groundtruth = sconv:forward(input)
 
-      input =   input:type(typename) --makeNonContiguous(input:type(typename))
+      input = input:type(typename)
       local gconv = nn.VolumetricConvolution(from,to,ki,kk,kj,si,sk,sj):type(typename)
       gconv.weight = sconv.weight:type(typename)
       gconv.bias = sconv.bias:type(typename)
@@ -4247,14 +4247,14 @@ function cunntest.forward_batch()
    local ink = (outk-1)*sk+kk
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,ini,inj, ink):type(typename))
+      local input = torch.randn(bs,from,ini,inj, ink):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
       local sconv = nn.VolumetricConvolution(from,to,ki,kk,kj,si,sj,sk):type(ctype)
       local groundtruth = sconv:forward(input)
 
-      input = makeNonContiguous(input:type(typename))
+      input = input:type(typename)
       local gconv = nn.VolumetricConvolution(from,to,ki,kk,kj,si,sj,sk):type(typename)
       gconv.weight = sconv.weight:type(typename)
       gconv.bias = sconv.bias:type(typename)
@@ -4285,8 +4285,8 @@ function cunntest.VolumetricConvolution_backward_single()
    local ink = (outk-1)*sk+kk
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from, ini, inj, ink):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(to, outi, outj, outk):type(typename))
+      local input = torch.randn(from, ini, inj, ink):type(typename)
+      local gradOutput = torch.randn(to, outi, outj, outk):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4342,8 +4342,8 @@ function cunntest.VolumetricConvolution_backward_batch()
    local ink = (outk-1)*sk+kk
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs, from, ini, inj, ink):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs, to, outi, outj, outk):type(typename))
+      local input = torch.randn(bs, from, ini, inj, ink):type(typename)
+      local gradOutput = torch.randn(bs, to, outi, outj, outk):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4355,11 +4355,11 @@ function cunntest.VolumetricConvolution_backward_batch()
       local groundweight = sconv.gradWeight
       local groundbias = sconv.gradBias
 
-      input = makeNonContiguous(input:type(typename))
-      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      input = input:type(typename)
+      gradOutput = gradOutput:type(typename)
       local gconv = nn.VolumetricConvolution(from,to,ki,kk,kj,si,sk,sj):type(typename)
-      gconv.weight = makeNonContiguous(sconv.weight:type(typename))
-      gconv.bias = makeNonContiguous(sconv.bias:type(typename))
+      gconv.weight = sconv.weight:type(typename)
+      gconv.bias = sconv.bias:type(typename)
       gconv:forward(input)
       gconv:zeroGradParameters()
       local rescuda = gconv:backward(input, gradOutput)
@@ -4400,7 +4400,7 @@ function cunntest.VolumetricMaxPooling_forward()
    local oW = math.floor((iW - kW + 2*padW) / dW + 1)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename))
+      local input = torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4436,7 +4436,7 @@ function cunntest.VolumetricMaxPooling_backward()
    local oW = math.floor((iW - kW + 2*padW) / dW + 1)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename))
+      local input = torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4483,7 +4483,7 @@ function cunntest.VolumetricDilatedMaxPooling_forward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,int,inj,ini):type(typename))
+      local input = torch.randn(bs,from,int,inj,ini):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4527,8 +4527,8 @@ function cunntest.VolumetricDilatedMaxPooling_backward_batch()
    local ceil_mode = math.random(0,1) == 1
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(bs,from,int,inj,ini):type(typename))
-      local gradOutput = makeNonContiguous(torch.randn(bs,to,outt,outj,outi):type(typename))
+      local input = torch.randn(bs,from,int,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outt,outj,outi):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4660,7 +4660,7 @@ function cunntest.VolumetricAveragePooling_forward()
    local iW = (oW - 1) * dW + kW
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename))
+      local input = torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4693,7 +4693,7 @@ function cunntest.VolumetricAveragePooling_backward()
    local iW = (oW - 1) * dW + kW
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename))
+      local input = torch.Tensor(iF, iT, iH, iW):float():uniform(-1, 1):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -4797,11 +4797,12 @@ function cunntest.PReLU_forward()
     local nOutputPlane = 8
     local w = math.random(1,100)
     local h = math.random(1,100)
-    local input = makeNonContiguous(torch.randn(nOutputPlane,h,w))
 
     for k, typename in ipairs(typenames) do
+      local input = torch.randn(nOutputPlane,h,w):type(typename)
       local ctype = t2cpu[typename]
-      local input = makeNonContiguous(input:type(ctype))
+
+      input = input:type(ctype)
       local sconv = nn.PReLU(nOutputPlane):type(ctype)
       local groundtruth = sconv:forward(input)
 
@@ -4821,11 +4822,11 @@ function cunntest.PReLU_backward()
     local h = math.random(1,10)
 
     for k, typename in ipairs(typenames) do
-        local input = makeNonContiguous(torch.randn(nOutputPlane, h, w):type(typename))
-        local gradOutput = makeNonContiguous(torch.randn(#input):type(typename))
+        local input = torch.randn(nOutputPlane, h, w):type(typename)
+        local gradOutput = torch.randn(#input):type(typename)
         local ctype = t2cpu[typename]
-        input = makeNonContiguous(input:type(ctype))
-        gradOutput = makeNonContiguous(gradOutput:type(ctype))
+        input = input:type(ctype)
+        gradOutput = gradOutput:type(ctype)
         local sconv = nn.PReLU(nOutputPlane):type(ctype)
         local gconv = sconv:clone():type(typename)
 
@@ -4858,7 +4859,7 @@ function cunntest.RReLU_forward()
     for k, typename in ipairs(typenames) do
        for _,train in ipairs({true,false}) do
           for _,inplace in ipairs({false,true}) do
-              local input = makeNonContiguous(torch.randn(nOutputPlane, h, w):type(typename) - 0.5)
+              local input = torch.randn(nOutputPlane, h, w):type(typename) - 0.5
               local ctype = t2cpu[typename]
               input = makeNonContiguous(input:type(ctype))
               local sconv = nn.RReLU(1/8, 1/3, inplace):type(ctype)
@@ -4890,8 +4891,8 @@ function cunntest.RReLU_backward()
         for _,train in ipairs({true,false}) do
             for _,inplace in ipairs({false,true}) do
                 local ctype = t2cpu[typename]
-                local input = makeNonContiguous(torch.randn(nOutputPlane, h, w):type(typename))
-                local gradOutput = makeNonContiguous(torch.randn(#input):type(typename) - 0.5)
+                local input = torch.randn(nOutputPlane, h, w):type(typename)
+                local gradOutput = torch.randn(#input):type(typename) - 0.5
                 input = makeNonContiguous(input:type(ctype))
                 gradOutput = makeNonContiguous(gradOutput:type(ctype))
                 local sconv = nn.RReLU(1/8, 1/3, inplace):type(ctype)
@@ -5048,12 +5049,13 @@ function cunntest.VolumetricDilatedConvolution()
    local dilationW = math.random(1,10)
    local dilationH = math.random(1,10)
    local dilationT = math.random(1,10)
-   local ini = (outi - 1) * si - 2 * padW + dilationW * (ki-1) + 1
-   local inj = (outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1
-   local ink = (outk - 1) * sk - 2 * padT + dilationT * (kk-1) + 1
+   local ini = math.max((outi - 1) * si - 2 * padW + dilationW * (ki-1) + 1, ki)
+   local inj = math.max((outj - 1) * sj - 2 * padH + dilationH * (kj-1) + 1, kj)
+   local ink = math.max((outk - 1) * sk - 2 * padT + dilationT * (kk-1) + 1, kk)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.randn(from,ink,inj,ini):type(typename))
+      local input = torch.randn(from,ink,inj,ini):type(typename)
+      input = makeNonContiguous(input)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -5068,8 +5070,8 @@ function cunntest.VolumetricDilatedConvolution()
       input = makeNonContiguous(input:type(typename))
       gradOutput = makeNonContiguous(gradOutput:type(typename))
       local gconv = nn.VolumetricDilatedConvolution(from,to,kk,ki,kj,sk,si,sj,padT,padW,padH,dilationT,dilationW,dilationH):type(typename)
-      gconv.weight = makeNonContiguous(sconv.weight:type(typename))
-      gconv.bias = makeNonContiguous(sconv.bias:type(typename))
+      gconv.weight = sconv.weight:type(typename)
+      gconv.bias = sconv.bias:type(typename)
       local rescuda = gconv:forward(input)
       gconv:zeroGradParameters()
       local gradcuda = gconv:backward(input, gradOutput)
@@ -5224,7 +5226,7 @@ function cunntest.SpatialReflectionPadding_forward()
    local padB = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeY, sizeX):type(typename))
+      local input = torch.rand(batch, plane, sizeY, sizeX):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -5253,10 +5255,10 @@ function cunntest.SpatialReflectionPadding_backward()
    local padB = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeY, sizeX):type(typename))
-      local gradOutput = makeNonContiguous(torch.rand(
+      local input = torch.rand(batch, plane, sizeY, sizeX):type(typename)
+      local gradOutput = torch.rand(
           batch, plane, sizeY + padT + padB, sizeX + padL + padR
-       ):type(typename))
+       ):type(typename)
 
        local ctype = t2cpu[typename]
        input = makeNonContiguous(input:type(ctype))
@@ -5291,7 +5293,7 @@ function cunntest.SpatialReplicationPadding_forward()
    local padB = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeY, sizeX):type(typename))
+      local input = torch.rand(batch, plane, sizeY, sizeX):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -5320,10 +5322,10 @@ function cunntest.SpatialReplicationPadding_backward()
    local padB = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeY, sizeX):type(typename))
-      local gradOutput = makeNonContiguous(torch.rand(
+      local input = torch.rand(batch, plane, sizeY, sizeX):type(typename)
+      local gradOutput = torch.rand(
           batch, plane, sizeY + padT + padB, sizeX + padL + padR
-       ):type(typename))
+       ):type(typename)
 
        local ctype = t2cpu[typename]
        input = makeNonContiguous(input:type(ctype))
@@ -5361,7 +5363,7 @@ function cunntest.VolumetricReplicationPadding_forward()
    local pback = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeZ, sizeY, sizeX):type(typename))
+      local input = torch.rand(batch, plane, sizeZ, sizeY, sizeX):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -5395,11 +5397,11 @@ function cunntest.VolumetricReplicationPadding_backward()
    local pback = math.random(-3,3)
 
    for k, typename in ipairs(typenames) do
-      local input = makeNonContiguous(torch.rand(batch, plane, sizeZ, sizeY, sizeX):type(typename))
-      local gradOutput = makeNonContiguous(torch.rand(
+      local input = torch.rand(batch, plane, sizeZ, sizeY, sizeX):type(typename)
+      local gradOutput = torch.rand(
         batch, plane, sizeZ + pfront + pback, sizeY + ptop + pbottom,
         sizeX + pleft + pright
-      ):type(typename))
+      ):type(typename)
 
       local ctype = t2cpu[typename]
       input = makeNonContiguous(input:type(ctype))
@@ -5667,7 +5669,7 @@ function nn.testcuda(tests, print_timing, n_loop, seed)
    local oldtype = torch.getdefaulttensortype()
    torch.setdefaulttensortype('torch.FloatTensor')
    checkHalf()
-   initSeed(786893549)
+   initSeed(seed)
    mytester = torch.Tester()
    mytester:add(cunntest)
    mytester:run(tests)
