@@ -66,15 +66,26 @@ local function precision_backward_conv_weightbias(precision_b, tensor_type, maxa
 end
 
 local function makeNonContiguous(tensor)
-  local s=torch.LongStorage(tensor:size():size()+1)
-  for i=1,tensor:size():size() do s[i] = tensor:size()[i] end
-  s[s:size()] = math.random(2,10)
-  local y = torch[tensor:type():match('torch.(%a+)')]()
-  y:resize(s)
-  local z=y:select(s:size(), 1)
-  z:copy(tensor)
-  assert(not z:isContiguous() or (z:nElement() == 1))
-  return z
+   size = tensor:size()
+   local osize = {}
+   for i = 1, #size do osize[i] = size[i] end
+   -- randomly inflate a few dimensions in osize
+   for i = 1, 3 do
+      local dim = torch.random(1,#osize)
+      local add = torch.random(4, 15)
+      osize[dim] = osize[dim] + add
+   end
+   local input = torch[tensor:type():match('torch.(%a+)')]()
+   input:resize(torch.LongStorage(osize))
+   -- now extract the input of correct size from 'input'
+   for i = 1, #size do
+      if input:size(i) ~= size[i] then
+         local bounds = torch.random(1, input:size(i) - size[i] + 1)
+         input = input:narrow(i, bounds, size[i])
+      end
+   end
+   input:copy(tensor)
+   return input
 end
 
 local function pointwise_forward(proto_module, name, max_error)
