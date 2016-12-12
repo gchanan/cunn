@@ -47,6 +47,8 @@ function DataParallelTable:__init(dimension, flattenParams, usenccl)
       error "must specify a dimension!"
    end
 
+   self.typeStr = 'torch.CudaTensor'
+   print("###INIT TYPESTR: ", self.typeStr)
    self.dimension = dimension
    self.modules = {}
    self.gpuAssignments = {}  -- Which gpuid each module sits on
@@ -69,6 +71,7 @@ function DataParallelTable:__init(dimension, flattenParams, usenccl)
 end
 
 function DataParallelTable:add(module, gpus)
+   print("in add: ", type(gpus), type(module), gpus)
    if type(gpus) == 'number' then
       if #self.modules == 0 then
          table.insert(self.modules, module)
@@ -101,27 +104,44 @@ end
 
 -- this flattens parameters, so that syncParameters and accGradParameters can be much more efficient
 function DataParallelTable:flattenParameters()
+   print("beginning of flattenParameters", self.typeStr)
+   print(debug.traceback())
    self.flattenedParams = self.impl:exec(function(module)
       local p, dp = module:parameters()
       local flattened = true
+      print("#p", type(module), #p, module:type(), module)
       for i=2,#p do
          if p[i]:storage() ~= p[1]:storage()
             or dp[i]:storage() ~= dp[1]:storage() then
+            --print("i", i)
+            print("#pi", i, p[i]:storage():data(), p[1]:storage():data(), dp[i]:storage():data(), dp[1]:storage():data())
+            --print(p[1]:storage():data())
+            --print(dp[i]:storage():data())
+            --print(dp[1]:storage():data())
             flattened = false
-            break
+            --break
          end
       end
+      print("#flattened", flattened)
       if flattened then
-         local pp = torch.CudaTensor(p[1]:storage(), p[1]:storageOffset(),
+         print("in flattend stuff", module.typeStr, module:type())
+         local pp = torch[module:type():match('torch.(%a+)')](p[1]:storage(), p[1]:storageOffset(),
                     p[#p]:storageOffset()+p[#p]:numel()-p[1]:storageOffset())
-         local dpp = torch.CudaTensor(dp[1]:storage(), dp[1]:storageOffset(),
+         local dpp = torch[module:type():match('torch.(%a+)')](dp[1]:storage(), dp[1]:storageOffset(),
                      dp[#dp]:storageOffset()+dp[#dp]:numel()
                       - dp[1]:storageOffset())
+         print("###PP", pp:getDevice(), dpp:getDevice())
          return {pp, dpp}
       else
+          print("###GETPARAMETERS")
          return { module:getParameters() }
       end
    end)
+   print("###SET IN FLATTEN PARAMETERS")
+   print("#flattenedParameters", #self.flattenedParams, 2)
+   for i, parameters in ipairs(self.flattenedParams) do
+    print("#flattened2", i, parameters[2]:storage():data(), parameters[2]:getDevice(), "done flattened2")
+   end
    self.flattenParams = true
 end
 
@@ -134,8 +154,10 @@ local function hasFlattenedParameters(self)
    if not self.flattenedParams then
       return false
    end
-   for _, param in ipairs(self.modules[1]:parameters()) do
+   for i, param in ipairs(self.modules[1]:parameters()) do
+      print("###checking hasFlattneedParams")
       if param:storage() ~= self.flattenedParams[1][1]:storage() then
+         print("###hasFlattenedParams failed", i, param:storage():data(), self.flattenedParams[1][1]:storage():data())
          return false
       end
    end
@@ -178,7 +200,9 @@ local function _hasData(input)
 end
 
 function DataParallelTable:updateOutput(input)
+   print('flattenParams?', self.flattenParams, hasFlattenedParameters(self))
    if self.flattenParams and not hasFlattenedParameters(self) then
+      print('calling flattenParameters')
       self:flattenParameters()
    end
    if self.needsSync then
@@ -280,6 +304,7 @@ end
 
 function DataParallelTable:syncParameters()
    local prevGpuid = cutorch.getDevice()
+   print("###IN SYNC PARAMETERS")
    if self.flattenedParams and self.usenccl and not cudaLaunchBlocking then
       if #self.gpuAssignments > 1 then
          nccl.bcast(pluck(self.flattenedParams, 1), true, 1)
@@ -298,9 +323,13 @@ end
 function DataParallelTable:zeroGradParameters()
    local prevGpuid = cutorch.getDevice()
    if self.flattenedParams then
+   print("checking zeroGradParameters", self.flattenedParams)
       for i, parameters in ipairs(self.flattenedParams) do
          cutorch.setDevice(self.gpuAssignments[i])
+         print('type of parameters2 ', parameters[2]:type())
+         print('#device', parameters[2]:getDevice(), cutorch.getDevice(), parameters[2]:storage():data(),#self.flattenedParams)
          parameters[2]:zero()
+         print('done device')
       end
    else
       self.impl:exec(function(m)
@@ -313,6 +342,7 @@ end
 function DataParallelTable:updateParameters(learningRate)
    local prevGpuid = cutorch.getDevice()
    cutorch.setDevice(self.gpuAssignments[1])
+   print("UPDATING ASSIGNMENTS")
    self.modules[1]:updateParameters(learningRate)
    self:syncParameters()
    cutorch.setDevice(prevGpuid)
@@ -340,10 +370,13 @@ function DataParallelTable:reset(stdv)
 end
 
 function DataParallelTable:type(typeStr)
-   assert(typeStr == 'torch.CudaTensor', 'DataParallelTable supports only torch.CudaTensor type')
+   assert(typeStr == 'torch.CudaHalfTensor' or typeStr == 'torch.CudaTensor' or typeStr == 'torch.CudaDoubleTensor',
+          'DataParallelTable supports only torch.CudaHalfTensor or torch.CudaDoubleTensor or torch.CudaTensor types')
    for i, m in ipairs(self.modules) do
       m:type(typeStr)
    end
+   self.typeStr = typeStr
+   print("###SETTING TYPE:", self.typeStr)
    return self
 end
 
@@ -417,7 +450,9 @@ function DataParallelTable:__read(file, version)
             return { m:getParameters() }
          end
       end)
+      print("###DOING FLATTENED IN READ")
    end
+   print("###IN READ!")
 end
 
 function DataParallelTable:__write(file)
@@ -453,6 +488,7 @@ function DataParallelTable:_reflattenReplicaParameters()
             return { m:getParameters() }
          end
       end)
+      print("###REFLATTEND REPLICA PARAMETERS!")
    end
 end
 
@@ -501,7 +537,9 @@ function DataParallelTable:_reduce(gradParams)
    local dstGpuid = self.gpuAssignments[1]
    cutorch.setDevice(dstGpuid)
 
-   self.buffer = self.buffer or torch.CudaTensor()
+   print("about to create buffer")
+   self.buffer = self.buffer or torch[self.typeStr:match('torch.(%a+)')]()
+   print("done create buffer")
    for moduleIdx = 2, #gradParams do
       for paramIdx = 1, #gradParams[moduleIdx] do
          local dst = gradParams[1][paramIdx]
@@ -543,10 +581,13 @@ function DataParallelTable:_distributeTensorRecursive(dst, src, idx, n)
    end
 
    assert(torch.isTensor(src), 'input must be a tensor or table of tensors')
-   assert(src:type() == 'torch.CudaTensor' or src:type() == 'torch.FloatTensor',
-      'input must be a CUDA or Float tensor')
+   -- FIXME
+   --assert(src:type() == self.typeStr or src:type() == 'torch.HalfTensor',
+    --  'input must be a CUDA or Float tensor')
 
-   dst = torch.type(dst) == 'torch.CudaTensor' and dst or torch.CudaTensor()
+   print("about to create dst")
+   dst = torch.type(dst) == self.typeStr and dst or torch[self.typeStr:match('torch.(%a+)')]()
+    print("done to create dst")
 
    local srcsize = src:dim() > 0 and src:size(self.dimension) or 0
    local index, size = sliceRange(srcsize, idx, n)
@@ -554,6 +595,7 @@ function DataParallelTable:_distributeTensorRecursive(dst, src, idx, n)
       dst:resize(0)
    else
       local slice = src:narrow(self.dimension, index, size)
+      --print('dst', dst:type(), 'slice', slice:type(), 'src', src:type())
       dst:resize(slice:size()):copyAsync(slice)
       if slice.getDevice then
          waitForDevice(dst:getDevice(), slice:getDevice())
@@ -588,7 +630,9 @@ function DataParallelTable:_concatTensorRecursive(dst, src)
    assert(torch.isTensor(src[1]), 'input must be a tensor or table of tensors')
 
    cutorch.setDevice(self.gpuAssignments[1])
-   dst = torch.type(dst) == 'torch.CudaTensor' and dst or torch.CudaTensor()
+   print("about to do dst2")
+   dst = torch.type(dst) == self.typeStr and dst or torch[self.typeStr:match('torch.(%a+)')]()
+    print("done do dst2")
 
    local cumsum = sumSizes(src, self.dimension)
 
@@ -637,6 +681,7 @@ end
 
 -- Applies a function to each replica, combining the results into a table
 function BasicImpl:exec(closure, maxGpuIdx)
+   print("###IN BASICIMPL EXEC!")
    local prevGpuid = cutorch.getDevice()
    self:setup()
    local res = {}
@@ -702,6 +747,7 @@ function ThreadsImpl:setup()
 end
 
 function ThreadsImpl:exec(closure, maxGpuIdx)
+   print("###IN THREADSIMPL!")
    self:setup()
    local res = {}
    for i=1,#self.dpt.gpuAssignments do
