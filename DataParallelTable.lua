@@ -59,6 +59,8 @@ function DataParallelTable:__init(dimension, flattenParams, usenccl)
    self.flattenParams = flattenParams or false
    self.usenccl = false
    self.needsSync = false
+   self.file = io.open("syncParameters.txt", "w")
+   self.timer = torch.Timer()
    self.impl = Impls.Basic(self)
    if usenccl then
       assert(self.flattenParams, 'cannot use nccl without flattenParams')
@@ -289,6 +291,8 @@ function DataParallelTable:syncParameters()
       self:_broadcast(pluck(self:moduleParameters(), 1))
    end
    self.needsSync = false
+   self.file:write(tostring(self.timer:time().real) .. "\n")
+   self.timer:reset()
    cutorch.setDevice(prevGpuid)
 end
 
