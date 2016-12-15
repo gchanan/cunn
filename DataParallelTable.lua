@@ -60,7 +60,9 @@ function DataParallelTable:__init(dimension, flattenParams, usenccl)
    self.usenccl = false
    self.needsSync = false
    self.file = io.open("syncParameters.txt", "w")
+   self.fileReduce = io.open("reduceParameters.txt", "w")
    self.timer = torch.Timer()
+   self.timerReduce = torch.Timer()
    self.impl = Impls.Basic(self)
    if usenccl then
       assert(self.flattenParams, 'cannot use nccl without flattenParams')
@@ -248,6 +250,7 @@ function DataParallelTable:__backward(method, input, gradOutput, scale)
    if method == 'backward' or method == 'accGradParameters' then
       local params = self:moduleParameters()
       -- Accumulate the gradients onto the base GPU
+      self.timerReduce:reset()
       if self.flattenedParams and self.usenccl and not cudaLaunchBlocking then
          if #self.gpuAssignments > 1 then
             nccl.reduce(pluck(self.flattenedParams, 2), nil, true, 1)
@@ -255,6 +258,7 @@ function DataParallelTable:__backward(method, input, gradOutput, scale)
       else
          self:_reduce(pluck(params, 2))
       end
+      self.fileReduce:write(tostring(self.timerReduce:time().real) .. "\n")
       -- Zero out gradients on the other GPUs
       for i = 2, #self.gpuAssignments do
          cutorch.setDevice(self.gpuAssignments[i])
