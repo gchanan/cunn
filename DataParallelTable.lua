@@ -283,6 +283,7 @@ end
 
 function DataParallelTable:syncParameters()
    local prevGpuid = cutorch.getDevice()
+   self.timer:reset()
    if self.flattenedParams and self.usenccl and not cudaLaunchBlocking then
       if #self.gpuAssignments > 1 then
          nccl.bcast(pluck(self.flattenedParams, 1), true, 1)
@@ -292,7 +293,6 @@ function DataParallelTable:syncParameters()
    end
    self.needsSync = false
    self.file:write(tostring(self.timer:time().real) .. "\n")
-   self.timer:reset()
    cutorch.setDevice(prevGpuid)
 end
 
