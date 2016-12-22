@@ -154,6 +154,7 @@ local function getDevices(inputs)
     local device = v:getDevice()
     devices[i] = device
   end
+  return devices
 end
 
 local function synchronize(devices)
