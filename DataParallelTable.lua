@@ -147,6 +147,22 @@ local function hasFlattenedParameters(self)
    return true
 end
 
+
+local function getDevices(inputs)
+  local devices = torch.IntTensor(#inputs)
+  for i,v in ipairs(inputs) do
+    local device = v:getDevice()
+    devices[i] = device
+  end
+end
+
+local function synchronize(devices)
+   for i = 1, devices:nElement() do
+      cutorch.setDevice(devices[i])
+      cutorch.streamSynchronize(cutorch.getStream())
+   end
+end
+
 function DataParallelTable:training()
    self.impl:exec(function(module)
       module:training()
@@ -286,21 +302,6 @@ end
 
 function DataParallelTable:accGradParameters(input, gradOutput, scale)
    self:__backward('accGradParameters', input, gradOutput, scale)
-end
-
-local function getDevices(inputs)
-  local devices = torch.IntTensor(#inputs)
-  for i,v in ipairs(inputs) do
-    local device = v:getDevice()
-    devices[i] = device
-  end
-end
-
-local function synchronize(devices)
-   for i = 1, devices:nElement() do
-      cutorch.setDevice(devices[i])
-      cutorch.streamSynchronize(cutorch.getStream())
-   end
 end
 
 function DataParallelTable:syncParameters()
