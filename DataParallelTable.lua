@@ -250,10 +250,13 @@ function DataParallelTable:__backward(method, input, gradOutput, scale)
    if method == 'backward' or method == 'accGradParameters' then
       local params = self:moduleParameters()
       -- Accumulate the gradients onto the base GPU
+      local rparams = pluck(self.flattenedParams, 2)
+      local devices = getDevices(rparams)
+      synchronize(devices)
       self.timerReduce:reset()
       if self.flattenedParams and self.usenccl and not cudaLaunchBlocking then
          if #self.gpuAssignments > 1 then
-            nccl.reduce(pluck(self.flattenedParams, 2), nil, true, 1)
+            nccl.reduce(rparams, nil, false, 1)
          end
       else
          self:_reduce(pluck(params, 2))
@@ -285,12 +288,30 @@ function DataParallelTable:accGradParameters(input, gradOutput, scale)
    self:__backward('accGradParameters', input, gradOutput, scale)
 end
 
+local function getDevices(inputs)
+  local devices = torch.IntTensor(#inputs)
+  for i,v in ipairs(inputs) do
+    local device = v:getDevice()
+    devices[i] = device
+  end
+end
+
+local function synchronize(devices)
+   for i = 1, devices:nElement() do
+      cutorch.setDevice(devices[i])
+      cutorch.streamSynchronize(cutorch.getStream())
+   end
+end
+
 function DataParallelTable:syncParameters()
    local prevGpuid = cutorch.getDevice()
+   local fparams = pluck(self.flattenedParams, 1)
+   local devices = getDevices(fparams)
+   synchronize(devices)
    self.timer:reset()
    if self.flattenedParams and self.usenccl and not cudaLaunchBlocking then
       if #self.gpuAssignments > 1 then
-         nccl.bcast(pluck(self.flattenedParams, 1), true, 1)
+         nccl.bcast(fparams, false, 1)
       end
    else
       self:_broadcast(pluck(self:moduleParameters(), 1))
